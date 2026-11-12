@@ -681,8 +681,8 @@ canvas {
 /* ============================== KONFIGURATION ============================== */
 
 const MIN_WASTE_SIZE = 100;      // mm – ab dieser Größe gilt eine Restfläche als "nutzbarer Verschnitt"
-const LABEL_MIN_W = 40;          // px – ab dieser Canvas-Breite wird ein Bauteil-Label gezeichnet
-const LABEL_MIN_H = 18;
+const LABEL_MIN_W = 28;          // px – ab dieser Canvas-Breite wird ein Bauteil-Label gezeichnet
+const LABEL_MIN_H = 14;
 const WASTE_LABEL_MIN_W = 50;
 const WASTE_LABEL_MIN_H = 25;
 const CANVAS_MAX_WIDTH = 580;
@@ -1419,43 +1419,50 @@ function drawBeam(canvas, beam) {
   const scale = (canvas.width - padding * 2) / beam.len;
   const x0 = padding;
   const y0 = 12;
+  const colorOn = colorsEnabled();
 
-  ctx.fillStyle = '#e2d6b5';
+  ctx.fillStyle = colorOn ? '#e2d6b5' : '#ffffff';
   ctx.fillRect(x0, y0, beam.len * scale, barH);
-  ctx.strokeStyle = '#5c4033';
+  ctx.strokeStyle = colorOn ? '#5c4033' : '#000000';
   ctx.lineWidth = 2;
   ctx.strokeRect(x0, y0, beam.len * scale, barH);
 
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = '#ffffff';
   beam.placedParts.forEach((p) => {
     const x = x0 + p.x * scale, w = p.len * scale;
-    ctx.fillStyle = partFillColor(p.color);
+    ctx.fillStyle = colorOn ? p.color : '#ffffff';
     ctx.fillRect(x, y0, w, barH);
-    ctx.strokeStyle = partStrokeColor();
-    ctx.lineWidth = colorsEnabled() ? 1 : 2;
+    ctx.strokeStyle = colorOn ? '#ffffff' : '#000000';
+    ctx.lineWidth = colorOn ? 1 : 2;
     ctx.strokeRect(x, y0, w, barH);
-    if (w > LABEL_MIN_W) {
-      ctx.fillStyle = partLabelColor();
+    if (w >= LABEL_MIN_W) {
+      ctx.fillStyle = colorOn ? '#ffffff' : '#000000';
       ctx.textAlign = 'center';
-      ctx.font = 'bold 10px Arial';
-      ctx.fillText(p.name, x + w / 2, y0 + barH / 2 - 1, w - 4);
-      ctx.font = '9px Arial';
-      ctx.fillText(`${fromMm(p.len)}`, x + w / 2, y0 + barH / 2 + 11, w - 4);
+      ctx.textBaseline = 'middle';
+      if (w >= 70) {
+        ctx.font = 'bold 10px Arial';
+        ctx.fillText(p.name || '', x + w / 2, y0 + barH / 2 - 7, w - 4);
+        ctx.font = '9px Arial';
+        ctx.fillText(`${fromMm(p.len)} ${unitSuffix()}`, x + w / 2, y0 + barH / 2 + 8, w - 4);
+      } else {
+        ctx.font = 'bold 9px Arial';
+        ctx.fillText(`${fromMm(p.len)}`, x + w / 2, y0 + barH / 2, w - 4);
+      }
+      ctx.textBaseline = 'alphabetic';
     }
   });
 
   const rem = beam.remaining;
   if (rem >= MIN_BEAM_WASTE) {
     const x = x0 + beam.pos * scale, w = rem * scale;
-    ctx.fillStyle = 'rgba(189, 195, 199, 0.4)';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y0, w, barH);
-    ctx.strokeStyle = '#7f8c8d';
+    ctx.strokeStyle = '#000000';
     ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
     ctx.strokeRect(x, y0, w, barH);
     ctx.setLineDash([]);
     if (w > WASTE_LABEL_MIN_W) {
-      ctx.fillStyle = '#555555';
+      ctx.fillStyle = '#000000';
       ctx.font = 'italic 9px Arial';
       ctx.textAlign = 'center';
       ctx.fillText(`Rest: ${fromMm(rem)}`, x + w / 2, y0 + barH / 2 + 3);
@@ -1463,7 +1470,7 @@ function drawBeam(canvas, beam) {
   }
 
   // Maßangabe unter dem Balken
-  ctx.fillStyle = '#555555';
+  ctx.fillStyle = '#000000';
   ctx.font = '10px Arial';
   ctx.textAlign = 'left';
   ctx.fillText('0', x0, y0 + barH + 16);
@@ -1494,28 +1501,41 @@ function drawPlate(canvas, plate) {
   const scale = Math.min((canvas.width - padding * 2) / plate.w, (canvas.height - padding * 2) / plate.h);
   const offsetX = (canvas.width - plate.w * scale) / 2;
   const offsetY = (canvas.height - plate.h * scale) / 2;
+  const colorOn = colorsEnabled();
 
-  ctx.fillStyle = '#e2d6b5';
+  // Plattengrund: Holzton in Farbe, sonst weiß
+  ctx.fillStyle = colorOn ? '#e2d6b5' : '#ffffff';
   ctx.fillRect(offsetX, offsetY, plate.w * scale, plate.h * scale);
-  ctx.strokeStyle = '#5c4033';
+  ctx.strokeStyle = colorOn ? '#5c4033' : '#000000';
   ctx.lineWidth = 2;
   ctx.strokeRect(offsetX, offsetY, plate.w * scale, plate.h * scale);
 
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = '#ffffff';
   plate.placedParts.forEach((p) => {
     const x = offsetX + p.x * scale, y = offsetY + p.y * scale;
     const w = p.wActual * scale, h = p.hActual * scale;
-    ctx.fillStyle = partFillColor(p.color);
+    ctx.fillStyle = colorOn ? p.color : '#ffffff';
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = partStrokeColor();
-    ctx.lineWidth = colorsEnabled() ? 1 : 2;
+    ctx.strokeStyle = colorOn ? '#ffffff' : '#000000';
+    ctx.lineWidth = colorOn ? 1 : 2;
     ctx.strokeRect(x, y, w, h);
-    if (w > LABEL_MIN_W && h > LABEL_MIN_H) {
-      ctx.fillStyle = partLabelColor();
-      ctx.font = 'bold 10px Arial';
+    if (w >= LABEL_MIN_W && h >= LABEL_MIN_H) {
+      ctx.fillStyle = colorOn ? '#ffffff' : '#000000';
       ctx.textAlign = 'center';
-      ctx.fillText(p.name, x + w / 2, y + h / 2 + 3);
+      ctx.textBaseline = 'middle';
+      const sizeTxt = `${fromMm(p.wActual)}×${fromMm(p.hActual)}`;
+      const maxFont = Math.min(12, Math.max(8, Math.floor(Math.min(w / 8, h / 3))));
+      if (h >= 28) {
+        ctx.font = `bold ${maxFont}px Arial`;
+        ctx.fillText(p.name || '', x + w / 2, y + h / 2 - maxFont * 0.55, w - 4);
+        ctx.font = `${Math.max(7, maxFont - 1)}px Arial`;
+        ctx.fillText(sizeTxt, x + w / 2, y + h / 2 + maxFont * 0.55, w - 4);
+      } else {
+        // wenig Höhe: Name bevorzugt, sonst Maß
+        ctx.font = `bold ${Math.max(7, maxFont)}px Arial`;
+        const label = (p.name && w > 50) ? p.name : sizeTxt;
+        ctx.fillText(label, x + w / 2, y + h / 2, w - 4);
+      }
+      ctx.textBaseline = 'alphabetic';
     }
   });
 
@@ -1524,18 +1544,21 @@ function drawPlate(canvas, plate) {
     const x = offsetX + sp.x * scale, y = offsetY + sp.y * scale;
     const w = sp.w * scale, h = sp.h * scale;
 
-    ctx.fillStyle = 'rgba(189, 195, 199, 0.4)';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#7f8c8d';
+    ctx.strokeStyle = '#000000';
     ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
 
     if (w > WASTE_LABEL_MIN_W && h > WASTE_LABEL_MIN_H) {
-      ctx.fillStyle = '#555555';
+      ctx.fillStyle = '#000000';
       ctx.font = 'italic 9px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`Rest: ${fromMm(sp.w)}x${fromMm(sp.h)}`, x + w / 2, y + h / 2 + 3);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`Rest: ${fromMm(sp.w)}x${fromMm(sp.h)}`, x + w / 2, y + h / 2);
+      ctx.textBaseline = 'alphabetic';
     }
   });
 }
