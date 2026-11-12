@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zuschnitt">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="manifest" href="manifest.json">
+<title>Zuschnittoptimierung</title>
+<style>
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  margin: 0;
+  padding: 8px;
+  background-color: #f4f6f9;
+  color: #333;
+  -webkit-tap-highlight-color: transparent;
+}
+.container {
+  max-width: 1800px;
+  margin: 0 auto;
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+h2 {
+  color: #2c3e50;
+  border-bottom: 2px solid #34495e;
+  padding-bottom: 10px;
+  margin: 0 0 12px 0;
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+h3 {
+  margin: 0 0 10px 0;
+  color: #2980b9;
+  font-size: 1rem;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 6px;
+}
+
+.grid-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.input-group {
+  border: 1px solid #cbd5e0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fdfdfd;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+label { display: block; margin: 10px 0 5px; font-weight: 600; font-size: 13px; }
+input, select {
+  width: 100%;
+  padding: 10px 8px;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px; /* verhindert Zoom auf iOS */
+  min-height: 44px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+th, td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+th { background-color: #f7fafc; font-weight: 600; font-size: 12px; }
+td input, td select {
+  min-width: 48px;
+  min-height: 40px;
+  padding: 8px 4px;
+  font-size: 15px;
+}
+
+.btn-add {
+  background: #3498db;
+  color: white;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-block;
+  min-height: 44px;
+  width: 100%;
+  max-width: 280px;
+}
+.btn-add:hover, .btn-add:active { background: #2980b9; }
+.btn-delete {
+  background: #e74c3c;
+  color: white;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 40px;
+  min-height: 40px;
+}
+.btn-delete:hover, .btn-delete:active { background: #c0392b; }
+
+.action-bar {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+  background: #e2e8f0;
+  padding: 12px;
+  border-radius: 10px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  position: sticky;
+  bottom: 8px;
+  z-index: 20;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+}
+.action-bar button {
+  padding: 14px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 600;
+  color: white;
+  min-height: 48px;
+  flex: 1 1 auto;
+  touch-action: manipulation;
+}
+.action-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+button.calc-btn {
+  flex: 2 1 100%;
+  min-width: 100%;
+  background: #27ae60;
+  font-size: 16px;
+  order: -1;
+}
+button.calc-btn:hover:not(:disabled), button.calc-btn:active:not(:disabled) { background: #219653; }
+button.save-btn { background: #2c3e50; }
+button.save-btn:hover:not(:disabled), button.save-btn:active:not(:disabled) { background: #1a252f; }
+button.load-btn { background: #8e44ad; position: relative; }
+button.load-btn:hover:not(:disabled), button.load-btn:active:not(:disabled) { background: #732d91; }
+button.load-btn input[type="file"] {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+button.print-btn { background: #7f8c8d; }
+button.print-btn:hover:not(:disabled), button.print-btn:active:not(:disabled) { opacity: 0.9; }
+button.pdf-btn { background: #d35400; }
+button.pdf-btn:hover:not(:disabled), button.pdf-btn:active:not(:disabled) { background: #a84300; }
+button.undo-btn { background: #16a085; }
+button.undo-btn:hover:not(:disabled), button.undo-btn:active:not(:disabled) { background: #128a72; }
+button.reset-btn { background: #95a5a6; }
+button.reset-btn:hover:not(:disabled), button.reset-btn:active:not(:disabled) { background: #7f8c8d; }
+
+.global-settings {
+  background: #edf2f7;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.global-settings > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.global-settings label { margin: 0; white-space: nowrap; font-size: 14px; }
+.global-settings input[type="number"] {
+  width: 72px;
+  padding: 8px;
+  min-height: 40px;
+  font-size: 16px;
+}
+.global-settings input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  accent-color: #2980b9;
+}
+
+.autosave-note { font-size: 12px; color: #7f8c8d; margin-left: auto; }
+
+.result-info {
+  padding: 14px;
+  background: #e8f4fd;
+  border-left: 5px solid #2980b9;
+  border-radius: 6px;
+  font-weight: 600;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.output-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.canvas-gallery {
+  border: 1px solid #ccc;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.canvas-container {
+  margin-bottom: 24px;
+  text-align: center;
+  border-bottom: 2px dashed #ccc;
+  padding-bottom: 12px;
+}
+.canvas-container:last-child { border: none; }
+.canvas-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #2c3e50;
+  text-align: left;
+  background: #f1f2f6;
+  padding: 8px 10px;
+  border-left: 3px solid #74b9ff;
+  font-size: 13px;
+  border-radius: 0 4px 4px 0;
+}
+
+canvas {
+  border: 1px solid #333;
+  background: #fff;
+  display: block;
+  margin: 8px auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.cut-list {
+  text-align: left;
+  font-size: 12px;
+  margin: 8px auto 0;
+  max-width: 100%;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 10px 10px 10px 28px;
+  line-height: 1.45;
+}
+.cut-list li { margin-bottom: 4px; }
+
+.live-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.list-box {
+  border: 1px solid #ccc;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  height: fit-content;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.color-badge {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border: 1px solid #7f8c8d;
+}
+
+.hint { font-size: 12px; color: #7f8c8d; margin: 6px 0 4px; line-height: 1.45; }
+.empty-hint { color: #7f8c8d; text-align: center; padding: 20px; }
+
+
+
+/* Weitere Aktionen einklappbar */
+.action-fold {
+  flex: 1 1 100%;
+  width: 100%;
+  border: none;
+}
+.action-fold-summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  text-align: center;
+  padding: 12px 14px;
+  background: #5d6d7e;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+.action-fold-summary::-webkit-details-marker { display: none; }
+.action-fold[open] > .action-fold-summary {
+  border-radius: 8px 8px 0 0;
+  background: #4a5a6a;
+}
+.action-fold-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  background: #d5dbe3;
+  border-radius: 0 0 8px 8px;
+}
+.action-fold-body button {
+  flex: 1 1 calc(50% - 8px);
+  min-width: calc(50% - 8px);
+}
+@media (max-width: 400px) {
+  .action-fold-body button {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+}
+@media (min-width: 901px) {
+  .action-fold {
+    flex: 1 1 auto;
+    display: contents; /* Desktop: alle Buttons sichtbar, kein Klappen nötig */
+  }
+  .action-fold-summary { display: none; }
+  .action-fold-body {
+    display: contents;
+    padding: 0;
+    background: transparent;
+  }
+  .action-fold-body button {
+    flex: 1 1 auto;
+    min-width: auto;
+  }
+}
+
+/* Einklappbare Abschnitte */
+.section-fold {
+  border: none;
+}
+.section-fold > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  margin: -4px 0 8px 0;
+  border-bottom: 1px solid #ddd;
+}
+.section-fold > summary::-webkit-details-marker { display: none; }
+.section-fold > summary::before {
+  content: "▼";
+  font-size: 11px;
+  color: #2980b9;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+.section-fold:not([open]) > summary::before {
+  transform: rotate(-90deg);
+}
+.section-fold > summary h3 {
+  margin: 0;
+  border: none;
+  padding: 0;
+  flex: 1;
+  font-size: 1rem;
+}
+.section-fold:not([open]) > summary {
+  margin-bottom: 0;
+  border-bottom-color: transparent;
+}
+.section-fold:not([open]) {
+  /* kompakter wenn zugeklappt */
+}
+.input-group:has(.section-fold:not([open])) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* ===== Mobile / Tablet Optimierungen ===== */
+@media (max-width: 900px) {
+  .grid-inputs,
+  .output-section {
+    grid-template-columns: 1fr;
+  }
+  .action-bar {
+    gap: 8px;
+    padding: 10px;
+  }
+  .action-bar button {
+    flex: 1 1 calc(50% - 8px);
+    min-width: calc(50% - 8px);
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+  button.calc-btn {
+    flex: 1 1 100%;
+    min-width: 100%;
+    font-size: 16px;
+  }
+  .canvas-gallery {
+    max-height: none;
+  }
+}
+
+@media (max-width: 600px) {
+  body { padding: 4px; padding-bottom: 80px; }
+  .container {
+    padding: 10px;
+    padding-bottom: 24px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  h2 { font-size: 1.2rem; }
+  h3 { font-size: 0.95rem; }
+
+  .global-settings {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+  }
+  .autosave-note { margin-left: 0; }
+
+  .input-group { padding: 10px; }
+
+  table { font-size: 12px; }
+  th, td { padding: 6px 3px; }
+  td input, td select {
+    min-width: 52px;
+    min-height: 42px;
+    padding: 8px 3px;
+    font-size: 15px;
+  }
+
+  .btn-add {
+    width: 100%;
+    max-width: none;
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .btn-delete {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+
+  .action-bar {
+    position: sticky;
+    bottom: 4px;
+    margin: 12px -4px 8px;
+    border-radius: 12px;
+    gap: 6px;
+  }
+  .action-bar button {
+    flex: 1 1 calc(50% - 6px);
+    min-width: calc(50% - 6px);
+    font-size: 12.5px;
+    padding: 12px 6px;
+    min-height: 48px;
+  }
+  button.calc-btn {
+    flex: 1 1 100%;
+    min-width: 100%;
+    font-size: 15px;
+    order: -1;
+  }
+
+  .result-info {
+    font-size: 13px;
+    padding: 12px;
+  }
+
+  .canvas-title { font-size: 12px; padding: 6px 8px; }
+  .cut-list { font-size: 11.5px; padding: 8px 8px 8px 24px; }
+
+  .list-box { padding: 10px; }
+  .list-box table { font-size: 11.5px; }
+  .list-box th, .list-box td { padding: 5px 3px; }
+
+  #liveListTable th:nth-child(3),
+  #liveListTable td:nth-child(3) {
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 400px) {
+  .action-bar button {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+  button.calc-btn { order: -1; }
+}
+
+@media print {
+  body { background: white; margin: 0; padding: 0; font-size: 11px; }
+  .container { box-shadow: none; padding: 0; max-width: 100%; border-radius: 0; }
+  .grid-inputs, .action-bar, .global-settings, .btn-add, .btn-delete { display: none !important; }
+  .output-section { display: block !important; }
+  .canvas-gallery, .list-box { border: none; padding: 0; max-height: none; overflow: visible; }
+  .canvas-container { page-break-inside: avoid; }
+  .list-box { page-break-before: always; margin-top: 30px; }
+  th { background-color: #f1f2f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .color-badge, canvas { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Zuschnitt & Holzliste</h2>
+
+  <div class="global-settings">
+    <div>
+      <label for="kerf">Sägeblattstärke / Verschnitt (mm):</label>
+      <input type="number" id="kerf" value="4">
+    </div>
+    <div>
+      <input type="checkbox" id="toggleCutList" checked style="width:auto;">
+      <label for="toggleCutList" style="display:inline;">Schnittreihenfolge anzeigen</label>
+    </div>
+    <span class="autosave-note" id="autosaveNote"></span>
+  </div>
+
+  <div class="grid-inputs">
+    <div class="input-group">
+      <details open class="section-fold">
+      <summary><h3>1. Trägerplatten (Lager)</h3></summary>
+      <table id="platesTable">
+        <thead>
+          <tr><th>Länge</th><th>Breite</th><th>Dicke</th><th>Material</th><th>Preis</th><th>Anz.</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn-add" id="btnAddPlate">+ Trägerplatte hinzufügen</button>
+      </details>
+    </div>
+
+    <div class="input-group">
+      <details open class="section-fold">
+      <summary><h3>2. Bauteile (Stückliste)</h3></summary>
+      <table id="partsTable">
+        <thead>
+          <tr><th>Name</th><th>Länge</th><th>Breite</th><th>Dicke</th><th>Material</th><th>Kante</th><th>Stk.</th><th>Faser</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn-add" id="btnAddPart">+ Bauteil hinzufügen</button>
+      </details>
+    </div>
+  </div>
+
+  <div class="grid-inputs">
+    <div class="input-group">
+      <details open class="section-fold">
+      <summary><h3>3. Balken (Lager)</h3></summary>
+      <div class="hint">Bei Balken zählt nur die Länge. Querschnitt (z. B. 60x80) und Material bestimmen, aus welchem Balken zugeschnitten wird. 60x80 und 80x60 gelten als gleich.</div>
+      <table id="beamsTable">
+        <thead>
+          <tr><th>Querschnitt</th><th>Länge</th><th>Material</th><th>Preis</th><th>Anz.</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn-add" id="btnAddBeam">+ Balken hinzufügen</button>
+      </details>
+    </div>
+
+    <div class="input-group">
+      <details open class="section-fold">
+      <summary><h3>4. Balkenteile (Längen)</h3></summary>
+      <div class="hint">Querschnitt wie im Lager eintragen. Längenzugabe wird einmal pro Stück addiert.</div>
+      <table id="beamPartsTable">
+        <thead>
+          <tr><th>Name</th><th>Länge</th><th>Querschnitt</th><th>Material</th><th>Zugabe</th><th>Stk.</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button class="btn-add" id="btnAddBeamPart">+ Balkenteil hinzufügen</button>
+      </details>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="calc-btn" id="btnCalc">Zuschnitt live optimieren</button>
+    <details class="action-fold" id="actionFold">
+      <summary class="action-fold-summary">Weitere Aktionen ▾</summary>
+      <div class="action-fold-body">
+        <button class="undo-btn" id="btnUndo" disabled>↩️ Rückgängig</button>
+        <button class="save-btn" id="btnSave">💾 Sägeprojekt speichern</button>
+        <button class="load-btn">
+          📂 Projekt laden
+          <input type="file" id="importFile" accept=".json">
+        </button>
+        <button class="pdf-btn" id="btnExportPdf">📄 Als PDF exportieren</button>
+        <button class="print-btn" id="btnPrint">🖨️ Sägeplan drucken</button>
+        <button class="reset-btn" id="btnReset">🗑️ Alles zurücksetzen</button>
+      </div>
+    </details>
+  </div>
+
+  <div class="result-info" id="resultText">
+    Bitte füge Trägerplatten und Bauteile hinzu. Das Programm berechnet alles automatisch.
+  </div>
+
+  <div class="output-section">
+    <div>
+      <h3>Sägeplan</h3>
+      <div class="canvas-gallery" id="canvasGallery">
+        <p class="empty-hint">Keine Daten vorhanden. Bitte füge Platten hinzu.</p>
+      </div>
+    </div>
+
+    <div class="live-list-container">
+      <div class="list-box">
+        <details open class="section-fold">
+        <summary><h3>Holzliste / Status</h3></summary>
+        <table id="liveListTable">
+          <thead>
+            <tr><th></th><th>Bauteil</th><th>Material</th><th>Länge</th><th>Breite</th><th>Dicke</th><th>Bedarf</th><th>OK</th><th>Status</th></tr>
+          </thead>
+          <tbody><tr><td colspan="9" style="color:#7f8c8d;">Noch keine Daten berechnet.</td></tr></tbody>
+        </table>
+        </details>
+      </div>
+
+      <div class="list-box">
+        <details open class="section-fold">
+        <summary><h3>Nutzbarer Verschnitt</h3></summary>
+        <table id="wasteListTable">
+          <thead>
+            <tr><th>Herkunftsplatte</th><th>Material</th><th>Breite (X)</th><th>Höhe (Y)</th><th>Fläche (m²)</th></tr>
+          </thead>
+          <tbody><tr><td colspan="5" style="color:#7f8c8d;">Noch kein Verschnitt berechnet.</td></tr></tbody>
+        </table>
+        </details>
+      </div>
+
+      <div class="list-box">
+        <details open class="section-fold">
+        <summary><h3>Restbalken</h3></summary>
+        <table id="beamWasteTable">
+          <thead>
+            <tr><th>Herkunftsbalken</th><th>Material</th><th>Querschnitt</th><th>Restlänge</th></tr>
+          </thead>
+          <tbody><tr><td colspan="4" style="color:#7f8c8d;">Noch kein Restbalken berechnet.</td></tr></tbody>
+        </table>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+"use strict";
+
+/* ============================== KONFIGURATION ============================== */
+
+const MIN_WASTE_SIZE = 100;      // mm – ab dieser Größe gilt eine Restfläche als "nutzbarer Verschnitt"
+const LABEL_MIN_W = 40;          // px – ab dieser Canvas-Breite wird ein Bauteil-Label gezeichnet
+const LABEL_MIN_H = 18;
+const WASTE_LABEL_MIN_W = 50;
+const WASTE_LABEL_MIN_H = 25;
+const CANVAS_MAX_WIDTH = 580;
+const COLORS = ['#2980b9', '#e67e22', '#27ae60', '#8e44ad', '#c0392b', '#16a085', '#f39c12', '#2c3e50'];
+const STORAGE_KEY = 'zuschnitt_autosave_v1';
+
+const PLATE_FIELDS = [
+  { key: 'w',         type: 'number', default: 2800 },
+  { key: 'h',         type: 'number', default: 2070 },
+  { key: 'thickness', type: 'number', default: 19 },
+  { key: 'material',  type: 'text',   default: 'Standard' },
+  { key: 'price',     type: 'number', default: 0, step: '0.01' },
+  { key: 'qty',       type: 'number', default: 1 },
+];
+
+const PART_FIELDS = [
+  { key: 'name',        type: 'text',   default: 'Bauteil' },
+  { key: 'w',            type: 'number', default: 500 },
+  { key: 'h',            type: 'number', default: 300 },
+  { key: 'thickness',    type: 'number', default: 19 },
+  { key: 'material',     type: 'text',   default: 'Standard' },
+  { key: 'edgeband',     type: 'number', default: 0 },
+  { key: 'count',        type: 'number', default: 1 },
+  { key: 'orientation',  type: 'select', default: 'fix', options: [['fix', 'Fix'], ['frei', 'Frei']] },
+];
+
+const MIN_BEAM_WASTE = 200;      // mm – ab dieser Länge gilt ein Balkenrest als "nutzbar"
+const BEAM_CANVAS_HEIGHT = 80;
+
+const BEAM_FIELDS = [
+  { key: 'profile',  type: 'text',   default: '60x80' },
+  { key: 'len',      type: 'number', default: 3000 },
+  { key: 'material', type: 'text',   default: 'Standard' },
+  { key: 'price',    type: 'number', default: 0, step: '0.01' },
+  { key: 'qty',      type: 'number', default: 1 },
+];
+
+const BEAM_PART_FIELDS = [
+  { key: 'name',      type: 'text',   default: 'Balken' },
+  { key: 'len',       type: 'number', default: 1000 },
+  { key: 'profile',   type: 'text',   default: '60x80' },
+  { key: 'material',  type: 'text',   default: 'Standard' },
+  { key: 'allowance', type: 'number', default: 0 },
+  { key: 'count',     type: 'number', default: 1 },
+];
+
+const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Querschnitt vereinheitlichen: "60 x 80", "80×60", "60*80" -> "60x80"
+function normProfile(str) {
+  const nums = (String(str).replace(/,/g, '.').match(/\d+(\.\d+)?/g) || []).map(Number).sort((a, b) => a - b);
+  return nums.length ? nums.join('x') : String(str).trim().toLowerCase();
+}
+const normText = (str) => String(str).trim().toLowerCase();
+
+const getColor = (index) => COLORS[index % COLORS.length];
+
+/* ============================== DOM-HELFER ============================== */
+
+const qs = (sel) => document.querySelector(sel);
+const tbodyOf = (tableId) => qs(`#${tableId} tbody`);
+const rowIndexIn = (row) => Array.prototype.indexOf.call(row.parentNode.rows, row);
+
+let undoStack = [];
+
+// Erzeugt eine Tabellenzeile generisch aus einer Feld-Konfiguration (ersetzt die
+// separaten HTML-Template-Strings von addPlateRow/addPartRow/loadProject).
+// `index` erlaubt das Wiedereinfügen an der ursprünglichen Position (für Undo).
+function createRow(tableId, fields, values = {}, index = -1) {
+  const row = tbodyOf(tableId).insertRow(index);
+
+  fields.forEach((field) => {
+    const cell = row.insertCell();
+    const value = values[field.key] !== undefined ? values[field.key] : field.default;
+
+    if (field.type === 'select') {
+      const select = document.createElement('select');
+      field.options.forEach(([optValue, optLabel]) => {
+        const opt = new Option(optLabel, optValue, false, optValue === value);
+        select.add(opt);
+      });
+      cell.appendChild(select);
+    } else {
+      const input = document.createElement('input');
+      input.type = field.type;
+      if (field.step) input.step = field.step;
+      input.value = value;
+      cell.appendChild(input);
+    }
+  });
+
+  const delCell = row.insertCell();
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-delete';
+  delBtn.textContent = 'X';
+  delBtn.addEventListener('click', () => {
+    const deletedIndex = rowIndexIn(row);
+    const deletedValues = getRowValues(row, fields);
+    row.remove();
+    pushUndo({ tableId, fields, index: deletedIndex, values: deletedValues });
+    berechneZuschnitt();
+  });
+  delCell.appendChild(delBtn);
+
+  return row;
+}
+
+function getRowValues(row, fields) {
+  const values = {};
+  fields.forEach((field, i) => { values[field.key] = row.cells[i].children[0].value; });
+  return values;
+}
+
+function readTableRows(tableId, fields) {
+  return [...tbodyOf(tableId).rows].map((row) => getRowValues(row, fields));
+}
+
+function clearTable(tableId) { tbodyOf(tableId).innerHTML = ''; }
+
+/* ============================== UNDO ============================== */
+
+function pushUndo(entry) {
+  undoStack.push(entry);
+  updateUndoButton();
+}
+
+function undoLastDelete() {
+  const entry = undoStack.pop();
+  if (!entry) return;
+  createRow(entry.tableId, entry.fields, entry.values, entry.index);
+  updateUndoButton();
+  berechneZuschnitt();
+}
+
+function updateUndoButton() {
+  qs('#btnUndo').disabled = undoStack.length === 0;
+}
+
+/* ============================== PROJEKT SPEICHERN / LADEN ============================== */
+
+function collectProjectData() {
+  return {
+    kerf: qs('#kerf').value,
+    plates: readTableRows('platesTable', PLATE_FIELDS),
+    parts: readTableRows('partsTable', PART_FIELDS),
+    beams: readTableRows('beamsTable', BEAM_FIELDS),
+    beamParts: readTableRows('beamPartsTable', BEAM_PART_FIELDS),
+  };
+}
+
+function applyProjectData(data) {
+  qs('#kerf').value = data.kerf || 4;
+  clearTable('platesTable');
+  (data.plates || []).forEach((p) => createRow('platesTable', PLATE_FIELDS, p));
+  clearTable('partsTable');
+  (data.parts || []).forEach((p) => createRow('partsTable', PART_FIELDS, p));
+  clearTable('beamsTable');
+  (data.beams || []).forEach((p) => createRow('beamsTable', BEAM_FIELDS, p));
+  clearTable('beamPartsTable');
+  (data.beamParts || []).forEach((p) => createRow('beamPartsTable', BEAM_PART_FIELDS, p));
+}
+
+/* iOS/Safari-tauglicher Download/Share */
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+async function downloadOrShareBlob(blob, filename, mime) {
+  const file = new File([blob], filename, { type: mime || blob.type || 'application/octet-stream' });
+
+  // iOS: Web Share mit Datei ist der zuverlässigste Weg
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return true;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return false; // Nutzer abgebrochen
+      // weiter zu Fallback
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.rel = 'noopener';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // iOS öffnet oft nur den Inhalt – Hinweis geben
+  if (isIOS()) {
+    setTimeout(() => {
+      alert('Auf dem iPhone: Im geöffneten Inhalt „Teilen“ tippen und z. B. in Dateien speichern.\n\nZuverlässiger: Seite über GitHub Pages (https://…) öffnen oder „Sägeplan drucken“ → „Als PDF“.');
+    }, 300);
+  }
+  return true;
+}
+
+async function saveProject() {
+  const json = JSON.stringify(collectProjectData(), null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  await downloadOrShareBlob(blob, 'saege_projekt.json', 'application/json');
+}
+
+function loadProject(event) {
+  const input = event.target;
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      applyProjectData(JSON.parse(reader.result));
+      undoStack = [];
+      updateUndoButton();
+      berechneZuschnitt();
+    } catch (e) {
+      alert('Fehler beim Laden der Projektdatei.');
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function resetAll() {
+  if (!confirm('Wirklich alle Platten, Balken, Bauteile und den gespeicherten Autosave-Stand löschen?')) return;
+  clearTable('platesTable');
+  clearTable('partsTable');
+  clearTable('beamsTable');
+  clearTable('beamPartsTable');
+  undoStack = [];
+  updateUndoButton();
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignorieren */ }
+  berechneZuschnitt();
+}
+
+/* ============================== AUTOSAVE (localStorage) ============================== */
+// Hinweis: localStorage funktioniert nur, wenn diese Datei direkt im Browser
+// geöffnet wird (oder auf einem eigenen Server liegt). In der eingebetteten
+// Artefakt-Vorschau von Claude.ai ist der Zugriff aus Sicherheitsgründen
+// gesperrt – die Autosave-Funktion greift dort nicht, der Rest der App
+// funktioniert aber unabhängig davon normal weiter.
+
+function autosave() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectProjectData()));
+    qs('#autosaveNote').textContent = '✓ automatisch gespeichert';
+  } catch (e) {
+    qs('#autosaveNote').textContent = 'Autosave nicht verfügbar in dieser Ansicht (Datei lokal öffnen, um Autosave zu nutzen)';
+  }
+}
+
+function restoreAutosave() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    applyProjectData(JSON.parse(raw));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ============================== PACKING-ALGORITHMUS (GUILLOTINE / BEST-FIT) ============================== */
+
+class Plate {
+  constructor(id, w, h, thickness, material, price) {
+    this.id = id;
+    this.w = w;
+    this.h = h;
+    this.thickness = thickness;
+    this.material = material;
+    this.price = price;
+    this.placedParts = [];
+    this.freeSpaces = [{ x: 0, y: 0, w, h }];
+  }
+
+  // Sucht die kleinstmögliche freie Fläche, in die das Bauteil passt (Best-Fit),
+  // sowohl in normaler als auch – falls erlaubt – gedrehter Ausrichtung.
+  findBestFit(part) {
+    let best = null;
+    this.freeSpaces.forEach((space, index) => {
+      const score = space.w * space.h;
+      if (part.w <= space.w && part.h <= space.h && (!best || score < best.score)) {
+        best = { index, orientation: 'normal', score };
+      }
+      if (part.rotatable && part.h <= space.w && part.w <= space.h && (!best || score < best.score)) {
+        best = { index, orientation: 'rotated', score };
+      }
+    });
+    return best;
+  }
+
+  place(part, fit, kerf) {
+    const space = this.freeSpaces[fit.index];
+    this.freeSpaces.splice(fit.index, 1);
+
+    const wActual = fit.orientation === 'normal' ? part.w : part.h;
+    const hActual = fit.orientation === 'normal' ? part.h : part.w;
+    this.placedParts.push({ ...part, x: space.x, y: space.y, wActual, hActual });
+
+    const remainingW = space.w - wActual;
+    const remainingH = space.h - hActual;
+
+    // Guillotine-Schnitt: entlang der größeren Restdimension aufteilen, damit
+    // möglichst große zusammenhängende Restflächen entstehen.
+    if (remainingW > remainingH) {
+      if (remainingW > 0) this.freeSpaces.push({ x: space.x + wActual + kerf, y: space.y, w: remainingW - kerf, h: space.h });
+      if (remainingH > 0) this.freeSpaces.push({ x: space.x, y: space.y + hActual + kerf, w: wActual, h: remainingH - kerf });
+    } else {
+      if (remainingH > 0) this.freeSpaces.push({ x: space.x, y: space.y + hActual + kerf, w: space.w, h: remainingH - kerf });
+      if (remainingW > 0) this.freeSpaces.push({ x: space.x + wActual + kerf, y: space.y, w: remainingW - kerf, h: hActual });
+    }
+    this.freeSpaces = this.freeSpaces.filter((s) => s.w > 0 && s.h > 0);
+  }
+}
+
+function packParts(plates, partsPool, kerf) {
+  const sorted = [...partsPool].sort((a, b) => (b.w * b.h) - (a.w * a.h));
+
+  for (const part of sorted) {
+    let bestPlate = null;
+    let bestFit = null;
+
+    for (const plate of plates) {
+      // Nur Platten mit passender Dicke UND passendem Material kommen infrage.
+      if (plate.thickness !== part.thickness || plate.material !== part.material) continue;
+      const fit = plate.findBestFit(part);
+      if (fit && (!bestFit || fit.score < bestFit.score)) {
+        bestFit = fit;
+        bestPlate = plate;
+      }
+    }
+
+    if (bestPlate) bestPlate.place(part, bestFit, kerf);
+  }
+}
+
+/* ---- Balken: eindimensionales Packen (Best-Fit Decreasing) ----
+   Die Teile werden nacheinander vom Balkenanfang abgesägt. Zwischen zwei Teilen
+   geht je ein Sägeschnitt (kerf) verloren, ebenso beim Abtrennen des Restes. */
+class Beam {
+  constructor(id, len, profileKey, profile, materialKey, material, price) {
+    this.id = id;
+    this.len = len;
+    this.profileKey = profileKey;
+    this.profile = profile;
+    this.materialKey = materialKey;
+    this.material = material;
+    this.price = price;
+    this.placedParts = [];
+    this.pos = 0;            // Beginn des noch freien Bereichs (inkl. Sägeschnitt)
+  }
+  fits(len) { return this.pos + len <= this.len + 1e-9; }
+  leftoverAfter(len) { return this.len - (this.pos + len); }
+  place(part, kerf) {
+    this.placedParts.push({ ...part, x: this.pos });
+    this.pos += part.len + kerf;
+  }
+  get remaining() { return Math.max(0, this.len - this.pos); }
+}
+
+function packBeams(beams, beamPartsPool, kerf, beamSummary) {
+  const sorted = [...beamPartsPool].sort((a, b) => b.len - a.len);
+  for (const part of sorted) {
+    let best = null, bestLeft = Infinity;
+    for (const beam of beams) {
+      if (beam.profileKey !== part.profileKey || beam.materialKey !== part.materialKey) continue;
+      if (!beam.fits(part.len)) continue;
+      const left = beam.leftoverAfter(part.len);
+      if (left < bestLeft) { bestLeft = left; best = beam; }
+    }
+    if (best) {
+      best.place(part, kerf);
+      beamSummary[part.sid].placed++;
+    }
+  }
+}
+
+function updateSummaryPlacedCounts(plates, summaryList) {
+  plates.forEach((plate) => {
+    plate.placedParts.forEach((part) => {
+      const match = summaryList.find((s) =>
+        s.name === part.name && s.w === part.origW && s.h === part.origH &&
+        s.thickness === part.thickness && s.material === part.material);
+      if (match) match.placed++;
+    });
+  });
+}
+
+/* ============================== INPUT EINLESEN ============================== */
+
+function readInputs() {
+  const plates = [];
+  readTableRows('platesTable', PLATE_FIELDS).forEach((p, i) => {
+    const w = parseFloat(p.w) || 0, h = parseFloat(p.h) || 0;
+    const thickness = parseFloat(p.thickness) || 0, qty = parseInt(p.qty) || 0;
+    const material = p.material || 'Standard';
+    const price = parseFloat(p.price) || 0;
+    if (w > 0 && h > 0 && qty > 0 && thickness > 0) {
+      for (let q = 0; q < qty; q++) {
+        plates.push(new Plate(`Platte #${i + 1} (${material}, ${thickness}mm)`, w, h, thickness, material, price));
+      }
+    }
+  });
+
+  const partsPool = [];
+  const summaryList = [];
+  readTableRows('partsTable', PART_FIELDS).forEach((p, i) => {
+    const origW = parseFloat(p.w) || 0, origH = parseFloat(p.h) || 0;
+    const thickness = parseFloat(p.thickness) || 0, count = parseInt(p.count) || 0;
+    const material = p.material || 'Standard';
+    const edgeband = parseFloat(p.edgeband) || 0;
+    const rotatable = p.orientation === 'frei';
+    const color = getColor(i);
+
+    // Kantenzugabe wird auf beiden Seiten jeder Kante addiert -> zusätzliches
+    // Übermaß beim Zuschnitt, das nach dem Umleimen wieder abgetrennt wird.
+    const cutW = origW + 2 * edgeband;
+    const cutH = origH + 2 * edgeband;
+
+    if (origW > 0 && origH > 0 && count > 0 && thickness > 0) {
+      summaryList.push({ name: p.name, w: origW, h: origH, thickness, material, count, color, placed: 0 });
+      for (let c = 0; c < count; c++) {
+        partsPool.push({ name: p.name, w: cutW, h: cutH, origW, origH, thickness, material, rotatable, color });
+      }
+    }
+  });
+
+  // ---- Balken ----
+  const colorOffset = tbodyOf('partsTable').rows.length;
+
+  const beams = [];
+  readTableRows('beamsTable', BEAM_FIELDS).forEach((b, i) => {
+    const len = parseFloat(b.len) || 0, qty = parseInt(b.qty) || 0;
+    const material = (b.material || 'Standard').trim();
+    const profile = (b.profile || '').trim();
+    const price = parseFloat(b.price) || 0;
+    if (len > 0 && qty > 0) {
+      for (let q = 0; q < qty; q++) {
+        beams.push(new Beam(`Balken #${i + 1}${qty > 1 ? '.' + (q + 1) : ''} (${profile || 'ohne Querschnitt'}, ${material})`, len,
+          normProfile(profile), profile, normText(material), material, price));
+      }
+    }
+  });
+
+  const beamPartsPool = [];
+  const beamSummary = [];
+  readTableRows('beamPartsTable', BEAM_PART_FIELDS).forEach((p, i) => {
+    const origLen = parseFloat(p.len) || 0, count = parseInt(p.count) || 0;
+    const allowance = parseFloat(p.allowance) || 0;
+    const material = (p.material || 'Standard').trim();
+    const profile = (p.profile || '').trim();
+    const color = getColor(colorOffset + i);
+    if (origLen > 0 && count > 0) {
+      const sid = beamSummary.length;
+      beamSummary.push({ name: p.name, len: origLen, profile, material, count, color, placed: 0 });
+      for (let c = 0; c < count; c++) {
+        beamPartsPool.push({ sid, name: p.name, len: origLen + allowance, origLen,
+          profileKey: normProfile(profile), materialKey: normText(material), color });
+      }
+    }
+  });
+
+  return { plates, partsPool, summaryList, beams, beamPartsPool, beamSummary };
+}
+
+/* ============================== AUSWERTUNG ============================== */
+
+function computeStats(plates) {
+  let totalPlatesUsed = 0, totalAreaAvailable = 0, totalAreaUsed = 0, totalCost = 0;
+  plates.forEach((plate) => {
+    if (plate.placedParts.length === 0) return;
+    totalPlatesUsed++;
+    totalAreaAvailable += plate.w * plate.h;
+    totalCost += plate.price || 0;
+    plate.placedParts.forEach((p) => { totalAreaUsed += p.origW * p.origH; });
+  });
+  return { totalPlatesUsed, totalAreaAvailable, totalAreaUsed, totalCost };
+}
+
+function computeBeamStats(beams) {
+  let totalBeamsUsed = 0, totalLenAvailable = 0, totalLenUsed = 0, totalCost = 0;
+  beams.forEach((beam) => {
+    if (beam.placedParts.length === 0) return;
+    totalBeamsUsed++;
+    totalLenAvailable += beam.len;
+    totalCost += beam.price || 0;
+    beam.placedParts.forEach((p) => { totalLenUsed += p.origLen; });
+  });
+  return { totalBeamsUsed, totalLenAvailable, totalLenUsed, totalCost };
+}
+
+function getUsableBeamWaste(beams) {
+  const pieces = [];
+  beams.forEach((beam) => {
+    if (beam.placedParts.length === 0) return;
+    if (beam.remaining >= MIN_BEAM_WASTE) {
+      pieces.push({ beamId: beam.id, material: beam.material, profile: beam.profile, len: Math.round(beam.remaining) });
+    }
+  });
+  return pieces.sort((a, b) => b.len - a.len);
+}
+
+function getUsableWaste(plates) {
+  const pieces = [];
+  plates.forEach((plate) => {
+    if (plate.placedParts.length === 0) return;
+    plate.freeSpaces.forEach((sp) => {
+      if (sp.w >= MIN_WASTE_SIZE && sp.h >= MIN_WASTE_SIZE) {
+        pieces.push({ plateId: plate.id, material: plate.material, w: Math.round(sp.w), h: Math.round(sp.h) });
+      }
+    });
+  });
+  return pieces.sort((a, b) => (b.w * b.h) - (a.w * a.h));
+}
+
+/* ============================== RENDERING ============================== */
+
+function renderCanvases(plates, beams = []) {
+  const gallery = qs('#canvasGallery');
+  gallery.innerHTML = '';
+
+  const usedPlates = plates.filter((p) => p.placedParts.length > 0);
+  const usedBeams = beams.filter((b) => b.placedParts.length > 0);
+  if (usedPlates.length === 0 && usedBeams.length === 0) {
+    gallery.innerHTML = '<p class="empty-hint">Keine Platten berechnet. Trage oben Daten ein.</p>';
+    return;
+  }
+
+  usedPlates.forEach((plate) => {
+    const container = document.createElement('div');
+    container.className = 'canvas-container';
+
+    const title = document.createElement('div');
+    title.className = 'canvas-title';
+    title.innerHTML = `🛠️ <strong>${plate.id}</strong> | Maße: ${plate.w} x ${plate.h} mm` +
+      (plate.price > 0 ? ` | ${plate.price.toFixed(2)} €` : '');
+    container.appendChild(title);
+
+    const canvas = document.createElement('canvas');
+    const canvasWidth = Math.min(gallery.clientWidth - 20, CANVAS_MAX_WIDTH);
+    canvas.width = canvasWidth;
+    canvas.height = (canvasWidth * plate.h) / plate.w + 30;
+    container.appendChild(canvas);
+
+    if (qs('#toggleCutList').checked) {
+      container.appendChild(buildCutList(plate));
+    }
+    gallery.appendChild(container);
+
+    drawPlate(canvas, plate);
+  });
+
+  usedBeams.forEach((beam) => {
+    const container = document.createElement('div');
+    container.className = 'canvas-container';
+
+    const title = document.createElement('div');
+    title.className = 'canvas-title';
+    title.innerHTML = `🪵 <strong>${esc(beam.id)}</strong> | Länge: ${beam.len} mm` +
+      (beam.price > 0 ? ` | ${beam.price.toFixed(2)} €` : '');
+    container.appendChild(title);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.min(gallery.clientWidth - 20, CANVAS_MAX_WIDTH);
+    canvas.height = BEAM_CANVAS_HEIGHT;
+    container.appendChild(canvas);
+
+    if (qs('#toggleCutList').checked) {
+      container.appendChild(buildBeamCutList(beam));
+    }
+    gallery.appendChild(container);
+
+    drawBeam(canvas, beam);
+  });
+}
+
+// Schnittliste für Balken: Position ab Balkenanfang, in Sägereihenfolge.
+function buildBeamCutList(beam) {
+  const list = document.createElement('ol');
+  list.className = 'cut-list';
+  beam.placedParts.forEach((p) => {
+    const item = document.createElement('li');
+    item.textContent = `${p.name} – ${p.len} mm zuschneiden (von ${Math.round(p.x)} bis ${Math.round(p.x + p.len)} mm ab Balkenanfang)`;
+    list.appendChild(item);
+  });
+  if (beam.remaining >= MIN_BEAM_WASTE) {
+    const item = document.createElement('li');
+    item.textContent = `Rest: ${Math.round(beam.remaining)} mm`;
+    list.appendChild(item);
+  }
+  return list;
+}
+
+function drawBeam(canvas, beam) {
+  const ctx = canvas.getContext('2d');
+  const padding = 15;
+  const barH = 34;
+  const scale = (canvas.width - padding * 2) / beam.len;
+  const x0 = padding;
+  const y0 = 12;
+
+  ctx.fillStyle = '#e2d6b5';
+  ctx.fillRect(x0, y0, beam.len * scale, barH);
+  ctx.strokeStyle = '#5c4033';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x0, y0, beam.len * scale, barH);
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#ffffff';
+  beam.placedParts.forEach((p) => {
+    const x = x0 + p.x * scale, w = p.len * scale;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(x, y0, w, barH);
+    ctx.strokeRect(x, y0, w, barH);
+    if (w > LABEL_MIN_W) {
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 10px Arial';
+      ctx.fillText(p.name, x + w / 2, y0 + barH / 2 - 1, w - 4);
+      ctx.font = '9px Arial';
+      ctx.fillText(`${p.len}`, x + w / 2, y0 + barH / 2 + 11, w - 4);
+    }
+  });
+
+  const rem = beam.remaining;
+  if (rem >= MIN_BEAM_WASTE) {
+    const x = x0 + beam.pos * scale, w = rem * scale;
+    ctx.fillStyle = 'rgba(189, 195, 199, 0.4)';
+    ctx.fillRect(x, y0, w, barH);
+    ctx.strokeStyle = '#7f8c8d';
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(x, y0, w, barH);
+    ctx.setLineDash([]);
+    if (w > WASTE_LABEL_MIN_W) {
+      ctx.fillStyle = '#555555';
+      ctx.font = 'italic 9px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Rest: ${Math.round(rem)}`, x + w / 2, y0 + barH / 2 + 3);
+    }
+  }
+
+  // Maßangabe unter dem Balken
+  ctx.fillStyle = '#555555';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('0', x0, y0 + barH + 16);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${beam.len} mm`, x0 + beam.len * scale, y0 + barH + 16);
+}
+
+// Erzeugt eine nummerierte Schnittliste in der Reihenfolge, in der die
+// Bauteile auf dieser Platte platziert wurden (größte Teile zuerst).
+// Die Y-Position wird immer ab dem UNTEREN Plattenrand gemessen (Position der
+// unteren linken Ecke des Bauteils), unabhängig von der internen Zeichenlogik.
+function buildCutList(plate) {
+  const list = document.createElement('ol');
+  list.className = 'cut-list';
+  plate.placedParts.forEach((p) => {
+    const yFromBottom = plate.h - (p.y + p.hActual);
+    const item = document.createElement('li');
+    item.textContent = `${p.name} – ${p.wActual}×${p.hActual} mm zuschneiden, Position X:${Math.round(p.x)}mm / Y (von unten):${Math.round(yFromBottom)}mm`;
+    list.appendChild(item);
+  });
+  return list;
+}
+
+function drawPlate(canvas, plate) {
+  const ctx = canvas.getContext('2d');
+  const padding = 15;
+  const scale = Math.min((canvas.width - padding * 2) / plate.w, (canvas.height - padding * 2) / plate.h);
+  const offsetX = (canvas.width - plate.w * scale) / 2;
+  const offsetY = (canvas.height - plate.h * scale) / 2;
+
+  ctx.fillStyle = '#e2d6b5';
+  ctx.fillRect(offsetX, offsetY, plate.w * scale, plate.h * scale);
+  ctx.strokeStyle = '#5c4033';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(offsetX, offsetY, plate.w * scale, plate.h * scale);
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#ffffff';
+  plate.placedParts.forEach((p) => {
+    const x = offsetX + p.x * scale, y = offsetY + p.y * scale;
+    const w = p.wActual * scale, h = p.hActual * scale;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    if (w > LABEL_MIN_W && h > LABEL_MIN_H) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.name, x + w / 2, y + h / 2 + 3);
+    }
+  });
+
+  plate.freeSpaces.forEach((sp) => {
+    if (sp.w < MIN_WASTE_SIZE || sp.h < MIN_WASTE_SIZE) return;
+    const x = offsetX + sp.x * scale, y = offsetY + sp.y * scale;
+    const w = sp.w * scale, h = sp.h * scale;
+
+    ctx.fillStyle = 'rgba(189, 195, 199, 0.4)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#7f8c8d';
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+
+    if (w > WASTE_LABEL_MIN_W && h > WASTE_LABEL_MIN_H) {
+      ctx.fillStyle = '#555555';
+      ctx.font = 'italic 9px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Rest: ${Math.round(sp.w)}x${Math.round(sp.h)}`, x + w / 2, y + h / 2 + 3);
+    }
+  });
+}
+
+function renderResultText(stats, summaryList, totalPartsOrdered, beamStats, beamSummary, totalBeamPartsOrdered) {
+  const placedPlateParts = summaryList.reduce((sum, s) => sum + s.placed, 0);
+  const placedBeamParts = beamSummary.reduce((sum, s) => sum + s.placed, 0);
+  const totalOrdered = totalPartsOrdered + totalBeamPartsOrdered;
+  const totalPlaced = placedPlateParts + placedBeamParts;
+  const missing = totalOrdered - totalPlaced;
+
+  const showPlates = totalPartsOrdered > 0 || stats.totalPlatesUsed > 0 || totalBeamPartsOrdered === 0;
+  const showBeams = totalBeamPartsOrdered > 0 || beamStats.totalBeamsUsed > 0;
+
+  const placementText = totalOrdered === 0
+    ? 'noch keine Bauteile erfasst'
+    : missing === 0
+      ? 'Alle vollständig untergebracht!'
+      : `<span style="color:#e74c3c;">${missing} Teile passen nicht (Material/Dicke bzw. Querschnitt/Länge prüfen)!</span>`;
+
+  const plateEff = stats.totalAreaAvailable > 0 ? ((stats.totalAreaUsed / stats.totalAreaAvailable) * 100).toFixed(1) : 0;
+  const beamEff = beamStats.totalLenAvailable > 0 ? ((beamStats.totalLenUsed / beamStats.totalLenAvailable) * 100).toFixed(1) : 0;
+  const totalCost = stats.totalCost + beamStats.totalCost;
+
+  let html = '<strong>Gesamt-Auswertung (Verschnitt-optimiert):</strong><br>';
+  if (showPlates) html += `Benötigte Trägerplatten: <strong>${stats.totalPlatesUsed} Stück</strong> verwendet.<br>`;
+  if (showBeams) html += `Benötigte Balken: <strong>${beamStats.totalBeamsUsed} Stück</strong> verwendet (${(beamStats.totalLenAvailable / 1000).toFixed(2)} m Lagerlänge).<br>`;
+  html += `Bauteile zugewiesen: <strong>${totalPlaced} von ${totalOrdered} Teilen</strong> (${placementText})<br>`;
+  if (showPlates) html += `Reine Bauteil-Flächennutzung: <strong>${plateEff}%</strong> (Große, zusammenhängende Restplatten wurden maximiert!).<br>`;
+  if (showBeams) html += `Reine Bauteil-Längennutzung (Balken): <strong>${beamEff}%</strong>.<br>`;
+  if (totalCost > 0) html += `Materialkosten (nur verwendete Platten/Balken): <strong>${totalCost.toFixed(2)} €</strong>`;
+
+  qs('#resultText').innerHTML = html;
+}
+
+function renderSummaryTable(summaryList, beamSummary = []) {
+  const tbody = tbodyOf('liveListTable');
+  tbody.innerHTML = '';
+
+  if (summaryList.length === 0 && beamSummary.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="color:#7f8c8d;">Keine Bauteile in der Liste.</td></tr>';
+    return;
+  }
+
+  summaryList.forEach((item) => {
+    const isComplete = item.placed === item.count;
+    const statusText = isComplete ? '✔️ Fertig' : `⚠️ ${item.count - item.placed} fehlen!`;
+    const statusColor = isComplete ? '#27ae60' : '#e74c3c';
+    const row = tbody.insertRow();
+    row.innerHTML =
+      `<td><span class="color-badge" style="background-color:${item.color}"></span></td>` +
+      `<td style="text-align:left; font-weight:bold;">${item.name}</td>` +
+      `<td>${item.material}</td>` +
+      `<td>${item.w} mm</td><td>${item.h} mm</td><td><strong>${item.thickness} mm</strong></td>` +
+      `<td>${item.count}</td><td><strong style="color:${statusColor}">${item.placed}</strong></td>` +
+      `<td style="color:${statusColor}; font-weight:bold;">${statusText}</td>`;
+  });
+
+  beamSummary.forEach((item) => {
+    const isComplete = item.placed === item.count;
+    const statusText = isComplete ? '✔️ Fertig' : `⚠️ ${item.count - item.placed} fehlen!`;
+    const statusColor = isComplete ? '#27ae60' : '#e74c3c';
+    const row = tbody.insertRow();
+    row.innerHTML =
+      `<td><span class="color-badge" style="background-color:${item.color}"></span></td>` +
+      `<td style="text-align:left; font-weight:bold;">${esc(item.name)} <span style="font-weight:normal;color:#7f8c8d;">(Balken)</span></td>` +
+      `<td>${esc(item.material)}</td>` +
+      `<td><strong>${item.len} mm</strong></td><td colspan="2">Querschnitt ${esc(item.profile || '–')}</td>` +
+      `<td>${item.count}</td><td><strong style="color:${statusColor}">${item.placed}</strong></td>` +
+      `<td style="color:${statusColor}; font-weight:bold;">${statusText}</td>`;
+  });
+}
+
+function renderWasteTable(plates) {
+  const tbody = tbodyOf('wasteListTable');
+  tbody.innerHTML = '';
+  const pieces = getUsableWaste(plates);
+
+  if (pieces.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#7f8c8d;">Kein nennenswerter Verschnitt (>100x100mm) übrig.</td></tr>';
+    return;
+  }
+
+  pieces.forEach((piece) => {
+    const areaSqm = ((piece.w * piece.h) / 1_000_000).toFixed(2);
+    const row = tbody.insertRow();
+    row.innerHTML =
+      `<td style="text-align:left;">${piece.plateId}</td><td>${piece.material}</td>` +
+      `<td><strong>${piece.w} mm</strong></td><td><strong>${piece.h} mm</strong></td><td>${areaSqm} m²</td>`;
+  });
+}
+
+function renderBeamWasteTable(beams) {
+  const tbody = tbodyOf('beamWasteTable');
+  tbody.innerHTML = '';
+  const pieces = getUsableBeamWaste(beams);
+
+  if (pieces.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#7f8c8d;">Kein nennenswerter Restbalken (>${MIN_BEAM_WASTE} mm) übrig.</td></tr>`;
+    return;
+  }
+
+  pieces.forEach((piece) => {
+    const row = tbody.insertRow();
+    row.innerHTML =
+      `<td style="text-align:left;">${esc(piece.beamId)}</td><td>${esc(piece.material)}</td>` +
+      `<td>${esc(piece.profile || '–')}</td><td><strong>${piece.len} mm</strong></td>`;
+  });
+}
+
+/* ============================== PDF-EXPORT ============================== */
+
+function getJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  if (typeof window.jsPDF === 'function') return window.jsPDF;
+  return null;
+}
+
+async function exportPDF() {
+  const canvases = [...document.querySelectorAll('#canvasGallery canvas')];
+  if (canvases.length === 0) {
+    alert('Keine Sägepläne zum Exportieren vorhanden. Bitte zuerst Daten eingeben und optimieren.');
+    return;
+  }
+
+  const JsPDF = getJsPDF();
+  if (!JsPDF) {
+    alert('PDF-Bibliothek nicht geladen (Internet nötig).\n\nAlternative auf dem iPhone: „Sägeplan drucken“ → „Als PDF sichern“.');
+    return;
+  }
+
+  try {
+    const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    canvases.forEach((canvas, i) => {
+      if (i > 0) doc.addPage();
+      const titleEl = canvas.closest('.canvas-container') && canvas.closest('.canvas-container').querySelector('.canvas-title');
+      let title = (titleEl && titleEl.textContent) ? titleEl.textContent : 'Saegeplan';
+      title = title.replace(/[🛠️🪵]/g, '').replace(/€/g, 'EUR').trim().slice(0, 90);
+      const ratio = Math.min((pageWidth - 20) / canvas.width, (pageHeight - 28) / canvas.height);
+      const w = canvas.width * ratio;
+      const h = canvas.height * ratio;
+
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      doc.text(title || 'Saegeplan', 10, 12);
+      doc.addImage(canvas.toDataURL('image/png'), 'PNG', (pageWidth - w) / 2, 16, w, h);
+    });
+
+    // Blob statt doc.save – auf iOS zuverlässiger (Share-Sheet)
+    const blob = doc.output('blob');
+    await downloadOrShareBlob(blob, 'saegeplan.pdf', 'application/pdf');
+  } catch (err) {
+    console.error('PDF-Export fehlgeschlagen:', err);
+    alert('PDF-Export fehlgeschlagen.\n\nTipp iPhone: „Sägeplan drucken“ tippen und im Teilen-Menü „Als PDF sichern“ wählen.');
+  }
+}
+
+/* ============================== ORCHESTRIERUNG ============================== */
+
+function berechneZuschnitt() {
+  const kerf = parseFloat(qs('#kerf').value) || 0;
+  const { plates, partsPool, summaryList, beams, beamPartsPool, beamSummary } = readInputs();
+
+  packParts(plates, partsPool, kerf);
+  updateSummaryPlacedCounts(plates, summaryList);
+  packBeams(beams, beamPartsPool, kerf, beamSummary);
+
+  const stats = computeStats(plates);
+  const beamStats = computeBeamStats(beams);
+  renderCanvases(plates, beams);
+  renderResultText(stats, summaryList, partsPool.length, beamStats, beamSummary, beamPartsPool.length);
+  renderSummaryTable(summaryList, beamSummary);
+  renderWasteTable(plates);
+  renderBeamWasteTable(beams);
+  autosave();
+}
+
+/* ============================== EVENTS ============================== */
+
+function addPlateRow() { createRow('platesTable', PLATE_FIELDS); berechneZuschnitt(); }
+
+function addPartRow() {
+  // Dicke + Material vom letzten Bauteil übernehmen; Name/Länge/Breite leer lassen
+  const rows = tbodyOf('partsTable').rows;
+  const values = { name: '', w: '', h: '' };
+  if (rows.length > 0) {
+    const last = getRowValues(rows[rows.length - 1], PART_FIELDS);
+    values.thickness = last.thickness;
+    values.material = last.material;
+    // optional sinnvoll mitnehmen:
+    if (last.edgeband !== undefined) values.edgeband = last.edgeband;
+    if (last.orientation !== undefined) values.orientation = last.orientation;
+  }
+  createRow('partsTable', PART_FIELDS, values);
+  berechneZuschnitt();
+}
+
+function addBeamRow() { createRow('beamsTable', BEAM_FIELDS); berechneZuschnitt(); }
+
+function addBeamPartRow() {
+  // Querschnitt + Material vom letzten Balkenteil übernehmen; Name/Länge leer
+  const rows = tbodyOf('beamPartsTable').rows;
+  const values = { name: '', len: '' };
+  if (rows.length > 0) {
+    const last = getRowValues(rows[rows.length - 1], BEAM_PART_FIELDS);
+    values.profile = last.profile;
+    values.material = last.material;
+    if (last.allowance !== undefined) values.allowance = last.allowance;
+  }
+  createRow('beamPartsTable', BEAM_PART_FIELDS, values);
+  berechneZuschnitt();
+}
+
+document.getElementById('btnAddPlate').addEventListener('click', addPlateRow);
+document.getElementById('btnAddPart').addEventListener('click', addPartRow);
+document.getElementById('btnAddBeam').addEventListener('click', addBeamRow);
+document.getElementById('btnAddBeamPart').addEventListener('click', addBeamPartRow);
+document.getElementById('btnCalc').addEventListener('click', berechneZuschnitt);
+document.getElementById('btnUndo').addEventListener('click', undoLastDelete);
+document.getElementById('btnSave').addEventListener('click', saveProject);
+document.getElementById('btnExportPdf').addEventListener('click', exportPDF);
+document.getElementById('btnPrint').addEventListener('click', () => window.print());
+document.getElementById('btnReset').addEventListener('click', resetAll);
+document.getElementById('importFile').addEventListener('change', loadProject);
+document.getElementById('kerf').addEventListener('input', berechneZuschnitt);
+document.getElementById('toggleCutList').addEventListener('change', berechneZuschnitt);
+
+// Event-Delegation: EIN Listener pro Tabelle statt eines oninput-Handlers auf
+// jedem einzelnen Input/Select – funktioniert auch für dynamisch hinzugefügte
+// Zeilen, da die Events zur Tabelle hochblubbern.
+document.getElementById('platesTable').addEventListener('input', berechneZuschnitt);
+document.getElementById('partsTable').addEventListener('input', berechneZuschnitt);
+document.getElementById('platesTable').addEventListener('change', berechneZuschnitt);
+document.getElementById('partsTable').addEventListener('change', berechneZuschnitt);
+['beamsTable', 'beamPartsTable'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', berechneZuschnitt);
+  document.getElementById(id).addEventListener('change', berechneZuschnitt);
+});
+
+/* ============================== START ============================== */
+
+if (!restoreAutosave()) {
+  qs('#autosaveNote').textContent = '';
+}
+berechneZuschnitt();
+</script>
+
+</body>
+</html>
