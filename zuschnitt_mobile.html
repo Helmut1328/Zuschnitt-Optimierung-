@@ -830,7 +830,13 @@ function colorsEnabled() {
   return !el || el.checked;
 }
 function partFillColor(color) {
-  return colorsEnabled() ? color : '#7f8c8d';
+  return colorsEnabled() ? color : '#ffffff';
+}
+function partStrokeColor() {
+  return colorsEnabled() ? '#ffffff' : '#000000';
+}
+function partLabelColor() {
+  return colorsEnabled() ? '#ffffff' : '#000000';
 }
 
 
@@ -1426,10 +1432,11 @@ function drawBeam(canvas, beam) {
     const x = x0 + p.x * scale, w = p.len * scale;
     ctx.fillStyle = partFillColor(p.color);
     ctx.fillRect(x, y0, w, barH);
-    ctx.strokeStyle = colorsEnabled() ? '#ffffff' : '#2c3e50';
+    ctx.strokeStyle = partStrokeColor();
+    ctx.lineWidth = colorsEnabled() ? 1 : 2;
     ctx.strokeRect(x, y0, w, barH);
     if (w > LABEL_MIN_W) {
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = partLabelColor();
       ctx.textAlign = 'center';
       ctx.font = 'bold 10px Arial';
       ctx.fillText(p.name, x + w / 2, y0 + barH / 2 - 1, w - 4);
@@ -1501,10 +1508,11 @@ function drawPlate(canvas, plate) {
     const w = p.wActual * scale, h = p.hActual * scale;
     ctx.fillStyle = partFillColor(p.color);
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = colorsEnabled() ? '#ffffff' : '#2c3e50';
+    ctx.strokeStyle = partStrokeColor();
+    ctx.lineWidth = colorsEnabled() ? 1 : 2;
     ctx.strokeRect(x, y, w, h);
     if (w > LABEL_MIN_W && h > LABEL_MIN_H) {
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = partLabelColor();
       ctx.font = 'bold 10px Arial';
       ctx.textAlign = 'center';
       ctx.fillText(p.name, x + w / 2, y + h / 2 + 3);
