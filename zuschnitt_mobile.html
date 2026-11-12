@@ -504,6 +504,10 @@ canvas {
       <input type="checkbox" id="toggleCutList" checked style="width:auto;">
       <label for="toggleCutList" style="display:inline;">Schnittreihenfolge anzeigen</label>
     </div>
+    <div>
+      <input type="checkbox" id="toggleColors" checked style="width:auto;">
+      <label for="toggleColors" style="display:inline;">Sägeplan in Farbe</label>
+    </div>
     <span class="autosave-note" id="autosaveNote"></span>
   </div>
 
@@ -782,6 +786,15 @@ const normText = (str) => String(str).trim().toLowerCase();
 
 const getColor = (index) => COLORS[index % COLORS.length];
 
+function colorsEnabled() {
+  const el = document.getElementById('toggleColors');
+  return !el || el.checked;
+}
+function partFillColor(color) {
+  return colorsEnabled() ? color : '#7f8c8d';
+}
+
+
 /* ============================== DOM-HELFER ============================== */
 
 const qs = (sel) => document.querySelector(sel);
@@ -880,6 +893,8 @@ function collectProjectData() {
   return {
     unit: currentUnit(),
     kerf: qs('#kerf').value,
+    showColors: colorsEnabled(),
+    showCutList: !!(qs('#toggleCutList') && qs('#toggleCutList').checked),
     plates: readTableRows('platesTable', PLATE_FIELDS),
     parts: readTableRows('partsTable', PART_FIELDS),
     beams: readTableRows('beamsTable', BEAM_FIELDS),
@@ -893,6 +908,14 @@ function applyProjectData(data) {
   }
   qs('#kerf').value = data.kerf || (currentUnit() === 'cm' ? 0.4 : 4);
   updateUnitLabels();
+  if (typeof data.showColors === 'boolean') {
+    const tc = document.getElementById('toggleColors');
+    if (tc) tc.checked = data.showColors;
+  }
+  if (typeof data.showCutList === 'boolean') {
+    const tl = document.getElementById('toggleCutList');
+    if (tl) tl.checked = data.showCutList;
+  }
   clearTable('platesTable');
   (data.plates || []).forEach((p) => createRow('platesTable', PLATE_FIELDS, p));
   clearTable('partsTable');
@@ -1362,8 +1385,9 @@ function drawBeam(canvas, beam) {
   ctx.strokeStyle = '#ffffff';
   beam.placedParts.forEach((p) => {
     const x = x0 + p.x * scale, w = p.len * scale;
-    ctx.fillStyle = p.color;
+    ctx.fillStyle = partFillColor(p.color);
     ctx.fillRect(x, y0, w, barH);
+    ctx.strokeStyle = colorsEnabled() ? '#ffffff' : '#2c3e50';
     ctx.strokeRect(x, y0, w, barH);
     if (w > LABEL_MIN_W) {
       ctx.fillStyle = '#ffffff';
@@ -1436,8 +1460,9 @@ function drawPlate(canvas, plate) {
   plate.placedParts.forEach((p) => {
     const x = offsetX + p.x * scale, y = offsetY + p.y * scale;
     const w = p.wActual * scale, h = p.hActual * scale;
-    ctx.fillStyle = p.color;
+    ctx.fillStyle = partFillColor(p.color);
     ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = colorsEnabled() ? '#ffffff' : '#2c3e50';
     ctx.strokeRect(x, y, w, h);
     if (w > LABEL_MIN_W && h > LABEL_MIN_H) {
       ctx.fillStyle = '#ffffff';
@@ -1704,6 +1729,7 @@ document.getElementById('unitSelect').addEventListener('change', (e) => {
 qs('#unitSelect').dataset.prevUnit = currentUnit();
 updateUnitLabels();
 document.getElementById('toggleCutList').addEventListener('change', berechneZuschnitt);
+document.getElementById('toggleColors').addEventListener('change', berechneZuschnitt);
 
 // Event-Delegation: EIN Listener pro Tabelle statt eines oninput-Handlers auf
 // jedem einzelnen Input/Select – funktioniert auch für dynamisch hinzugefügte
