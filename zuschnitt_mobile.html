@@ -354,19 +354,35 @@ canvas {
   }
 }
 @media (min-width: 901px) {
+  /* Desktop: alle Aktionen sichtbar, ohne Klapp-Menü */
   .action-fold {
     flex: 1 1 auto;
-    display: contents; /* Desktop: alle Buttons sichtbar, kein Klappen nötig */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: stretch;
   }
-  .action-fold-summary { display: none; }
+  .action-fold-summary {
+    display: none !important;
+  }
   .action-fold-body {
-    display: contents;
+    display: flex !important;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 10px;
     padding: 0;
     background: transparent;
+    border-radius: 0;
+    width: 100%;
   }
   .action-fold-body button {
     flex: 1 1 auto;
-    min-width: auto;
+    min-width: 140px;
+  }
+  button.calc-btn {
+    flex: 1 1 100%;
+    min-width: 100%;
+    order: 0;
   }
 }
 
@@ -623,7 +639,7 @@ canvas {
 
   <div class="action-bar">
     <button class="calc-btn" id="btnCalc">Zuschnitt live optimieren</button>
-    <details class="action-fold" id="actionFold">
+    <details class="action-fold" id="actionFold" open>
       <summary class="action-fold-summary">Weitere Aktionen ▾</summary>
       <div class="action-fold-body">
         <button class="undo-btn" id="btnUndo" disabled>↩️ Rückgängig</button>
@@ -1669,6 +1685,17 @@ document.getElementById('partsTable').addEventListener('change', berechneZuschni
 if (!restoreAutosave()) {
   qs('#autosaveNote').textContent = '';
 }
+// Auf dem Handy Aktionsmenü standardmäßig zugeklappt, am PC offen
+(function initActionFold() {
+  const fold = document.getElementById('actionFold');
+  if (!fold) return;
+  const mobile = window.matchMedia('(max-width: 900px)');
+  function apply() {
+    fold.open = !mobile.matches;
+  }
+  apply();
+  mobile.addEventListener('change', apply);
+})();
 berechneZuschnitt();
 </script>
 
