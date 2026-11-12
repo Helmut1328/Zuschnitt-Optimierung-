@@ -306,83 +306,60 @@ canvas {
 
 
 
-/* Weitere Aktionen einklappbar */
-.action-fold {
+/* Weitere Aktionen: mobil einklappbar, Desktop immer sichtbar */
+.action-more-btn {
+  flex: 1 1 100%;
+  background: #5d6d7e !important;
+  color: #fff !important;
+  min-height: 48px;
+  font-size: 14px;
+}
+.action-more-btn:hover, .action-more-btn:active {
+  background: #4a5a6a !important;
+}
+.action-more-panel {
+  display: none;
   flex: 1 1 100%;
   width: 100%;
-  border: none;
-}
-.action-fold-summary {
-  list-style: none;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  text-align: center;
-  padding: 12px 14px;
-  background: #5d6d7e;
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  border-radius: 8px;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  touch-action: manipulation;
-}
-.action-fold-summary::-webkit-details-marker { display: none; }
-.action-fold[open] > .action-fold-summary {
-  border-radius: 8px 8px 0 0;
-  background: #4a5a6a;
-}
-.action-fold-body {
-  display: flex;
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px;
   background: #d5dbe3;
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px;
 }
-.action-fold-body button {
+.action-more-panel.is-open {
+  display: flex;
+}
+.action-more-panel button {
   flex: 1 1 calc(50% - 8px);
   min-width: calc(50% - 8px);
 }
 @media (max-width: 400px) {
-  .action-fold-body button {
+  .action-more-panel button {
     flex: 1 1 100%;
     min-width: 100%;
   }
 }
 @media (min-width: 901px) {
-  /* Desktop: alle Aktionen sichtbar, ohne Klapp-Menü */
-  .action-fold {
-    flex: 1 1 auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: stretch;
-  }
-  .action-fold-summary {
+  .action-more-btn {
     display: none !important;
   }
-  .action-fold-body {
+  .action-more-panel {
     display: flex !important;
     flex: 1 1 auto;
-    flex-wrap: wrap;
-    gap: 10px;
+    width: auto;
     padding: 0;
     background: transparent;
     border-radius: 0;
-    width: 100%;
+    gap: 10px;
   }
-  .action-fold-body button {
+  .action-more-panel button {
     flex: 1 1 auto;
     min-width: 140px;
   }
   button.calc-btn {
     flex: 1 1 100%;
     min-width: 100%;
-    order: 0;
   }
 }
 
@@ -639,20 +616,18 @@ canvas {
 
   <div class="action-bar">
     <button class="calc-btn" id="btnCalc">Zuschnitt live optimieren</button>
-    <details class="action-fold" id="actionFold" open>
-      <summary class="action-fold-summary">Weitere Aktionen ▾</summary>
-      <div class="action-fold-body">
-        <button class="undo-btn" id="btnUndo" disabled>↩️ Rückgängig</button>
-        <button class="save-btn" id="btnSave">💾 Sägeprojekt speichern</button>
-        <button class="load-btn">
-          📂 Projekt laden
-          <input type="file" id="importFile" accept=".json">
-        </button>
-        <button class="pdf-btn" id="btnExportPdf">📄 Als PDF exportieren</button>
-        <button class="print-btn" id="btnPrint">🖨️ Sägeplan drucken</button>
-        <button class="reset-btn" id="btnReset">🗑️ Alles zurücksetzen</button>
-      </div>
-    </details>
+    <button type="button" class="action-more-btn" id="btnActionMore" aria-expanded="false">Weitere Aktionen ▾</button>
+    <div class="action-more-panel" id="actionMorePanel">
+      <button class="undo-btn" id="btnUndo" disabled>↩️ Rückgängig</button>
+      <button class="save-btn" id="btnSave">💾 Sägeprojekt speichern</button>
+      <button class="load-btn">
+        📂 Projekt laden
+        <input type="file" id="importFile" accept=".json">
+      </button>
+      <button class="pdf-btn" id="btnExportPdf">📄 Als PDF exportieren</button>
+      <button class="print-btn" id="btnPrint">🖨️ Sägeplan drucken</button>
+      <button class="reset-btn" id="btnReset">🗑️ Alles zurücksetzen</button>
+    </div>
   </div>
 
   <div class="result-info" id="resultText">
@@ -1685,16 +1660,16 @@ document.getElementById('partsTable').addEventListener('change', berechneZuschni
 if (!restoreAutosave()) {
   qs('#autosaveNote').textContent = '';
 }
-// Auf dem Handy Aktionsmenü standardmäßig zugeklappt, am PC offen
-(function initActionFold() {
-  const fold = document.getElementById('actionFold');
-  if (!fold) return;
-  const mobile = window.matchMedia('(max-width: 900px)');
-  function apply() {
-    fold.open = !mobile.matches;
-  }
-  apply();
-  mobile.addEventListener('change', apply);
+// Weitere Aktionen: Toggle nur auf dem Handy nötig
+(function initActionMore() {
+  const btn = document.getElementById('btnActionMore');
+  const panel = document.getElementById('actionMorePanel');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', () => {
+    const open = panel.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btn.textContent = open ? 'Weitere Aktionen ▴' : 'Weitere Aktionen ▾';
+  });
 })();
 berechneZuschnitt();
 </script>
