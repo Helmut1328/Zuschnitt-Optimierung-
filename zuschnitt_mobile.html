@@ -1335,6 +1335,32 @@ function getUsableWaste(plates) {
 
 /* ============================== RENDERING ============================== */
 
+function plateLayoutKey(plate) {
+  const parts = plate.placedParts.map((p) =>
+    [p.name, p.x, p.y, p.wActual, p.hActual, p.origW, p.origH].join(':')
+  ).join('|');
+  return [plate.w, plate.h, plate.thickness, plate.material, parts].join('#');
+}
+
+function beamLayoutKey(beam) {
+  const parts = beam.placedParts.map((p) =>
+    [p.name, p.x, p.len, p.origLen].join(':')
+  ).join('|');
+  return [beam.len, beam.profileKey, beam.materialKey, parts].join('#');
+}
+
+function groupByLayout(items, keyFn) {
+  const map = new Map();
+  items.forEach((item) => {
+    const key = keyFn(item);
+    if (!map.has(key)) map.set(key, { item, count: 0, ids: [] });
+    const g = map.get(key);
+    g.count++;
+    g.ids.push(item.id);
+  });
+  return [...map.values()];
+}
+
 function renderCanvases(plates, beams = []) {
   const gallery = qs('#canvasGallery');
   gallery.innerHTML = '';
@@ -1346,13 +1372,19 @@ function renderCanvases(plates, beams = []) {
     return;
   }
 
-  usedPlates.forEach((plate) => {
+  groupByLayout(usedPlates, plateLayoutKey).forEach(({ item: plate, count }) => {
     const container = document.createElement('div');
     container.className = 'canvas-container';
 
     const title = document.createElement('div');
     title.className = 'canvas-title';
-    title.innerHTML = `🛠️ <strong>${plate.id}</strong> | Maße: ${fromMm(plate.w)} x ${fromMm(plate.h)} ${unitSuffix()}` +
+    const countLabel = count > 1
+      ? ` <span style="color:#2980b9;">× ${count} identisch</span>`
+      : '';
+    // Kurzbezeichnung ohne laufende Stücknummer-Häufung
+    const shortId = plate.id.replace(/\s*\(\d+\)\s*/, ' ').replace(/#\d+(\.\d+)?/, '').trim()
+      || plate.id;
+    title.innerHTML = `🛠️ <strong>${esc(shortId)}</strong>${countLabel} | Maße: ${fromMm(plate.w)} x ${fromMm(plate.h)} ${unitSuffix()}` +
       (plate.price > 0 ? ` | ${plate.price.toFixed(2)} €` : '');
     container.appendChild(title);
 
@@ -1370,13 +1402,17 @@ function renderCanvases(plates, beams = []) {
     drawPlate(canvas, plate);
   });
 
-  usedBeams.forEach((beam) => {
+  groupByLayout(usedBeams, beamLayoutKey).forEach(({ item: beam, count }) => {
     const container = document.createElement('div');
     container.className = 'canvas-container';
 
     const title = document.createElement('div');
     title.className = 'canvas-title';
-    title.innerHTML = `🪵 <strong>${esc(beam.id)}</strong> | Länge: ${fromMm(beam.len)} ${unitSuffix()}` +
+    const countLabel = count > 1
+      ? ` <span style="color:#2980b9;">× ${count} identisch</span>`
+      : '';
+    const profileLabel = beam.profile ? `${beam.profile}, ${beam.material}` : beam.material;
+    title.innerHTML = `🪵 <strong>Balken (${esc(profileLabel)})</strong>${countLabel} | Länge: ${fromMm(beam.len)} ${unitSuffix()}` +
       (beam.price > 0 ? ` | ${beam.price.toFixed(2)} €` : '');
     container.appendChild(title);
 
