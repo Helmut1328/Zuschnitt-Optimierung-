@@ -546,8 +546,15 @@ canvas {
 
   <div class="global-settings">
     <div>
-      <label for="kerf">Sägeblattstärke / Verschnitt (mm):</label>
-      <input type="number" id="kerf" value="4">
+      <label for="unitSelect">Einheit:</label>
+      <select id="unitSelect" style="width:auto; min-width:72px; min-height:40px; font-size:16px;">
+        <option value="mm" selected>mm</option>
+        <option value="cm">cm</option>
+      </select>
+    </div>
+    <div>
+      <label for="kerf">Sägeblattstärke / Verschnitt (<span class="unit-label">mm</span>):</label>
+      <input type="number" id="kerf" value="4" step="any">
     </div>
     <div>
       <input type="checkbox" id="toggleCutList" checked style="width:auto;">
@@ -698,6 +705,91 @@ const CANVAS_MAX_WIDTH = 580;
 const COLORS = ['#2980b9', '#e67e22', '#27ae60', '#8e44ad', '#c0392b', '#16a085', '#f39c12', '#2c3e50'];
 const STORAGE_KEY = 'zuschnitt_autosave_v1';
 
+/* ---- Einheiten (intern immer mm) ---- */
+function currentUnit() {
+  const el = document.getElementById('unitSelect');
+  return (el && el.value === 'cm') ? 'cm' : 'mm';
+}
+function unitFactor() {
+  // 1 Anzeige-Einheit in mm
+  return currentUnit() === 'cm' ? 10 : 1;
+}
+function unitSuffix() {
+  return currentUnit();
+}
+function toMm(v) {
+  const n = parseFloat(v);
+  return isFinite(n) ? n * unitFactor() : 0;
+}
+function fromMm(v) {
+  const n = Number(v);
+  if (!isFinite(n)) return '';
+  const x = n / unitFactor();
+  // schöne Darstellung ohne unnötige Nachkommastellen
+  return (Math.round(x * 1000) / 1000);
+}
+function fmtLen(mm) {
+  return `${fromMm(mm)} ${unitSuffix()}`;
+}
+function updateUnitLabels() {
+  document.querySelectorAll('.unit-label').forEach((el) => {
+    el.textContent = unitSuffix();
+  });
+}
+/** Zahlen in Profiltext "60x80" / "6x8" mit Faktor umrechnen */
+function convertProfileText(str, multiplyBy) {
+  return String(str).replace(/\d+(\.\d+)?/g, (m) => {
+    const n = parseFloat(m) * multiplyBy;
+    return String(Math.round(n * 1000) / 1000);
+  });
+}
+function convertAllInputsToUnit(fromUnit, toUnit) {
+  if (fromUnit === toUnit) return;
+  // from mm-based factor: value_in_from * fromFactor = mm; display = mm / toFactor
+  const fromF = fromUnit === 'cm' ? 10 : 1;
+  const toF = toUnit === 'cm' ? 10 : 1;
+  const mul = fromF / toF;
+
+  const kerf = document.getElementById('kerf');
+  if (kerf && kerf.value !== '') {
+    const n = parseFloat(kerf.value);
+    if (isFinite(n)) kerf.value = String(Math.round(n * mul * 1000) / 1000);
+  }
+
+  const dimKeysByTable = {
+    platesTable: ['w', 'h', 'thickness'],
+    partsTable: ['w', 'h', 'thickness', 'edgeband'],
+    beamsTable: ['len'],
+    beamPartsTable: ['len', 'allowance'],
+  };
+  const profileKeys = {
+    beamsTable: 'profile',
+    beamPartsTable: 'profile',
+  };
+
+  Object.keys(dimKeysByTable).forEach((tableId) => {
+    const fields = tableId === 'platesTable' ? PLATE_FIELDS
+      : tableId === 'partsTable' ? PART_FIELDS
+      : tableId === 'beamsTable' ? BEAM_FIELDS
+      : BEAM_PART_FIELDS;
+    [...tbodyOf(tableId).rows].forEach((row) => {
+      fields.forEach((field, i) => {
+        const input = row.cells[i] && row.cells[i].children[0];
+        if (!input) return;
+        if (dimKeysByTable[tableId].includes(field.key)) {
+          if (input.value === '') return;
+          const n = parseFloat(input.value);
+          if (isFinite(n)) input.value = String(Math.round(n * mul * 1000) / 1000);
+        }
+        if (profileKeys[tableId] === field.key && input.value) {
+          input.value = convertProfileText(input.value, mul);
+        }
+      });
+    });
+  });
+}
+
+
 const PLATE_FIELDS = [
   { key: 'w',         type: 'number', default: 2800 },
   { key: 'h',         type: 'number', default: 2070 },
@@ -762,10 +854,21 @@ let undoStack = [];
 // `index` erlaubt das Wiedereinfügen an der ursprünglichen Position (für Undo).
 function createRow(tableId, fields, values = {}, index = -1) {
   const row = tbodyOf(tableId).insertRow(index);
+  // Standard-Defaults in den Felddefinitionen sind in mm; bei cm umrechnen
+  const scaleDefault = (field, val) => {
+    if (values[field.key] !== undefined) return values[field.key];
+    if (field.type === 'number' && currentUnit() === 'cm' && typeof val === 'number') {
+      return Math.round((val / 10) * 1000) / 1000;
+    }
+    if (field.key === 'profile' && currentUnit() === 'cm' && typeof val === 'string') {
+      return convertProfileText(val, 0.1);
+    }
+    return val;
+  };
 
   fields.forEach((field) => {
     const cell = row.insertCell();
-    const value = values[field.key] !== undefined ? values[field.key] : field.default;
+    const value = scaleDefault(field, field.default);
 
     if (field.type === 'select') {
       const select = document.createElement('select');
@@ -834,6 +937,7 @@ function updateUndoButton() {
 
 function collectProjectData() {
   return {
+    unit: currentUnit(),
     kerf: qs('#kerf').value,
     plates: readTableRows('platesTable', PLATE_FIELDS),
     parts: readTableRows('partsTable', PART_FIELDS),
@@ -843,7 +947,11 @@ function collectProjectData() {
 }
 
 function applyProjectData(data) {
-  qs('#kerf').value = data.kerf || 4;
+  if (data.unit === 'cm' || data.unit === 'mm') {
+    qs('#unitSelect').value = data.unit;
+  }
+  qs('#kerf').value = data.kerf || (currentUnit() === 'cm' ? 0.4 : 4);
+  updateUnitLabels();
   clearTable('platesTable');
   (data.plates || []).forEach((p) => createRow('platesTable', PLATE_FIELDS, p));
   clearTable('partsTable');
@@ -1094,13 +1202,13 @@ function updateSummaryPlacedCounts(plates, summaryList) {
 function readInputs() {
   const plates = [];
   readTableRows('platesTable', PLATE_FIELDS).forEach((p, i) => {
-    const w = parseFloat(p.w) || 0, h = parseFloat(p.h) || 0;
-    const thickness = parseFloat(p.thickness) || 0, qty = parseInt(p.qty) || 0;
+    const w = toMm(p.w), h = toMm(p.h);
+    const thickness = toMm(p.thickness), qty = parseInt(p.qty) || 0;
     const material = p.material || 'Standard';
     const price = parseFloat(p.price) || 0;
     if (w > 0 && h > 0 && qty > 0 && thickness > 0) {
       for (let q = 0; q < qty; q++) {
-        plates.push(new Plate(`Platte #${i + 1} (${material}, ${thickness}mm)`, w, h, thickness, material, price));
+        plates.push(new Plate(`Platte #${i + 1} (${material}, ${fromMm(thickness)} ${unitSuffix()})`, w, h, thickness, material, price));
       }
     }
   });
@@ -1108,15 +1216,13 @@ function readInputs() {
   const partsPool = [];
   const summaryList = [];
   readTableRows('partsTable', PART_FIELDS).forEach((p, i) => {
-    const origW = parseFloat(p.w) || 0, origH = parseFloat(p.h) || 0;
-    const thickness = parseFloat(p.thickness) || 0, count = parseInt(p.count) || 0;
+    const origW = toMm(p.w), origH = toMm(p.h);
+    const thickness = toMm(p.thickness), count = parseInt(p.count) || 0;
     const material = p.material || 'Standard';
-    const edgeband = parseFloat(p.edgeband) || 0;
+    const edgeband = toMm(p.edgeband);
     const rotatable = p.orientation === 'frei';
     const color = getColor(i);
 
-    // Kantenzugabe wird auf beiden Seiten jeder Kante addiert -> zusätzliches
-    // Übermaß beim Zuschnitt, das nach dem Umleimen wieder abgetrennt wird.
     const cutW = origW + 2 * edgeband;
     const cutH = origH + 2 * edgeband;
 
@@ -1128,19 +1234,20 @@ function readInputs() {
     }
   });
 
-  // ---- Balken ----
   const colorOffset = tbodyOf('partsTable').rows.length;
 
   const beams = [];
   readTableRows('beamsTable', BEAM_FIELDS).forEach((b, i) => {
-    const len = parseFloat(b.len) || 0, qty = parseInt(b.qty) || 0;
+    const len = toMm(b.len), qty = parseInt(b.qty) || 0;
     const material = (b.material || 'Standard').trim();
     const profile = (b.profile || '').trim();
+    // Profilmaße in mm normieren (Anzeige kann cm sein)
+    const profileMm = convertProfileText(profile, unitFactor());
     const price = parseFloat(b.price) || 0;
     if (len > 0 && qty > 0) {
       for (let q = 0; q < qty; q++) {
         beams.push(new Beam(`Balken #${i + 1}${qty > 1 ? '.' + (q + 1) : ''} (${profile || 'ohne Querschnitt'}, ${material})`, len,
-          normProfile(profile), profile, normText(material), material, price));
+          normProfile(profileMm), profile, normText(material), material, price));
       }
     }
   });
@@ -1148,17 +1255,18 @@ function readInputs() {
   const beamPartsPool = [];
   const beamSummary = [];
   readTableRows('beamPartsTable', BEAM_PART_FIELDS).forEach((p, i) => {
-    const origLen = parseFloat(p.len) || 0, count = parseInt(p.count) || 0;
-    const allowance = parseFloat(p.allowance) || 0;
+    const origLen = toMm(p.len), count = parseInt(p.count) || 0;
+    const allowance = toMm(p.allowance);
     const material = (p.material || 'Standard').trim();
     const profile = (p.profile || '').trim();
+    const profileMm = convertProfileText(profile, unitFactor());
     const color = getColor(colorOffset + i);
     if (origLen > 0 && count > 0) {
       const sid = beamSummary.length;
       beamSummary.push({ name: p.name, len: origLen, profile, material, count, color, placed: 0 });
       for (let c = 0; c < count; c++) {
         beamPartsPool.push({ sid, name: p.name, len: origLen + allowance, origLen,
-          profileKey: normProfile(profile), materialKey: normText(material), color });
+          profileKey: normProfile(profileMm), materialKey: normText(material), color });
       }
     }
   });
@@ -1235,7 +1343,7 @@ function renderCanvases(plates, beams = []) {
 
     const title = document.createElement('div');
     title.className = 'canvas-title';
-    title.innerHTML = `🛠️ <strong>${plate.id}</strong> | Maße: ${plate.w} x ${plate.h} mm` +
+    title.innerHTML = `🛠️ <strong>${plate.id}</strong> | Maße: ${fromMm(plate.w)} x ${fromMm(plate.h)} ${unitSuffix()}` +
       (plate.price > 0 ? ` | ${plate.price.toFixed(2)} €` : '');
     container.appendChild(title);
 
@@ -1259,7 +1367,7 @@ function renderCanvases(plates, beams = []) {
 
     const title = document.createElement('div');
     title.className = 'canvas-title';
-    title.innerHTML = `🪵 <strong>${esc(beam.id)}</strong> | Länge: ${beam.len} mm` +
+    title.innerHTML = `🪵 <strong>${esc(beam.id)}</strong> | Länge: ${fromMm(beam.len)} ${unitSuffix()}` +
       (beam.price > 0 ? ` | ${beam.price.toFixed(2)} €` : '');
     container.appendChild(title);
 
@@ -1281,14 +1389,15 @@ function renderCanvases(plates, beams = []) {
 function buildBeamCutList(beam) {
   const list = document.createElement('ol');
   list.className = 'cut-list';
+  const u = unitSuffix();
   beam.placedParts.forEach((p) => {
     const item = document.createElement('li');
-    item.textContent = `${p.name} – ${p.len} mm zuschneiden (von ${Math.round(p.x)} bis ${Math.round(p.x + p.len)} mm ab Balkenanfang)`;
+    item.textContent = `${p.name} – ${fromMm(p.len)} ${u} zuschneiden (von ${fromMm(p.x)} bis ${fromMm(p.x + p.len)} ${u} ab Balkenanfang)`;
     list.appendChild(item);
   });
   if (beam.remaining >= MIN_BEAM_WASTE) {
     const item = document.createElement('li');
-    item.textContent = `Rest: ${Math.round(beam.remaining)} mm`;
+    item.textContent = `Rest: ${fromMm(beam.remaining)} ${u}`;
     list.appendChild(item);
   }
   return list;
@@ -1321,7 +1430,7 @@ function drawBeam(canvas, beam) {
       ctx.font = 'bold 10px Arial';
       ctx.fillText(p.name, x + w / 2, y0 + barH / 2 - 1, w - 4);
       ctx.font = '9px Arial';
-      ctx.fillText(`${p.len}`, x + w / 2, y0 + barH / 2 + 11, w - 4);
+      ctx.fillText(`${fromMm(p.len)}`, x + w / 2, y0 + barH / 2 + 11, w - 4);
     }
   });
 
@@ -1338,7 +1447,7 @@ function drawBeam(canvas, beam) {
       ctx.fillStyle = '#555555';
       ctx.font = 'italic 9px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`Rest: ${Math.round(rem)}`, x + w / 2, y0 + barH / 2 + 3);
+      ctx.fillText(`Rest: ${fromMm(rem)}`, x + w / 2, y0 + barH / 2 + 3);
     }
   }
 
@@ -1348,7 +1457,7 @@ function drawBeam(canvas, beam) {
   ctx.textAlign = 'left';
   ctx.fillText('0', x0, y0 + barH + 16);
   ctx.textAlign = 'right';
-  ctx.fillText(`${beam.len} mm`, x0 + beam.len * scale, y0 + barH + 16);
+  ctx.fillText(`${fromMm(beam.len)} ${unitSuffix()}`, x0 + beam.len * scale, y0 + barH + 16);
 }
 
 // Erzeugt eine nummerierte Schnittliste in der Reihenfolge, in der die
@@ -1358,10 +1467,11 @@ function drawBeam(canvas, beam) {
 function buildCutList(plate) {
   const list = document.createElement('ol');
   list.className = 'cut-list';
+  const u = unitSuffix();
   plate.placedParts.forEach((p) => {
     const yFromBottom = plate.h - (p.y + p.hActual);
     const item = document.createElement('li');
-    item.textContent = `${p.name} – ${p.wActual}×${p.hActual} mm zuschneiden, Position X:${Math.round(p.x)}mm / Y (von unten):${Math.round(yFromBottom)}mm`;
+    item.textContent = `${p.name} – ${fromMm(p.wActual)}×${fromMm(p.hActual)} ${u} zuschneiden, Position X:${fromMm(p.x)} ${u} / Y (von unten):${fromMm(yFromBottom)} ${u}`;
     list.appendChild(item);
   });
   return list;
@@ -1412,7 +1522,7 @@ function drawPlate(canvas, plate) {
       ctx.fillStyle = '#555555';
       ctx.font = 'italic 9px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(`Rest: ${Math.round(sp.w)}x${Math.round(sp.h)}`, x + w / 2, y + h / 2 + 3);
+      ctx.fillText(`Rest: ${fromMm(sp.w)}x${fromMm(sp.h)}`, x + w / 2, y + h / 2 + 3);
     }
   });
 }
@@ -1466,7 +1576,7 @@ function renderSummaryTable(summaryList, beamSummary = []) {
       `<td><span class="color-badge" style="background-color:${item.color}"></span></td>` +
       `<td style="text-align:left; font-weight:bold;">${item.name}</td>` +
       `<td>${item.material}</td>` +
-      `<td>${item.w} mm</td><td>${item.h} mm</td><td><strong>${item.thickness} mm</strong></td>` +
+      `<td>${fromMm(item.w)} ${unitSuffix()}</td><td>${fromMm(item.h)} ${unitSuffix()}</td><td><strong>${fromMm(item.thickness)} ${unitSuffix()}</strong></td>` +
       `<td>${item.count}</td><td><strong style="color:${statusColor}">${item.placed}</strong></td>` +
       `<td style="color:${statusColor}; font-weight:bold;">${statusText}</td>`;
   });
@@ -1480,7 +1590,7 @@ function renderSummaryTable(summaryList, beamSummary = []) {
       `<td><span class="color-badge" style="background-color:${item.color}"></span></td>` +
       `<td style="text-align:left; font-weight:bold;">${esc(item.name)} <span style="font-weight:normal;color:#7f8c8d;">(Balken)</span></td>` +
       `<td>${esc(item.material)}</td>` +
-      `<td><strong>${item.len} mm</strong></td><td colspan="2">Querschnitt ${esc(item.profile || '–')}</td>` +
+      `<td><strong>${fromMm(item.len)} ${unitSuffix()}</strong></td><td colspan="2">Querschnitt ${esc(item.profile || '–')}</td>` +
       `<td>${item.count}</td><td><strong style="color:${statusColor}">${item.placed}</strong></td>` +
       `<td style="color:${statusColor}; font-weight:bold;">${statusText}</td>`;
   });
@@ -1501,7 +1611,7 @@ function renderWasteTable(plates) {
     const row = tbody.insertRow();
     row.innerHTML =
       `<td style="text-align:left;">${piece.plateId}</td><td>${piece.material}</td>` +
-      `<td><strong>${piece.w} mm</strong></td><td><strong>${piece.h} mm</strong></td><td>${areaSqm} m²</td>`;
+      `<td><strong>${fromMm(piece.w)} ${unitSuffix()}</strong></td><td><strong>${fromMm(piece.h)} ${unitSuffix()}</strong></td><td>${areaSqm} m²</td>`;
   });
 }
 
@@ -1519,7 +1629,7 @@ function renderBeamWasteTable(beams) {
     const row = tbody.insertRow();
     row.innerHTML =
       `<td style="text-align:left;">${esc(piece.beamId)}</td><td>${esc(piece.material)}</td>` +
-      `<td>${esc(piece.profile || '–')}</td><td><strong>${piece.len} mm</strong></td>`;
+      `<td>${esc(piece.profile || '–')}</td><td><strong>${fromMm(piece.len)} ${unitSuffix()}</strong></td>`;
   });
 }
 
@@ -1641,6 +1751,17 @@ document.getElementById('btnPrint').addEventListener('click', () => window.print
 document.getElementById('btnReset').addEventListener('click', resetAll);
 document.getElementById('importFile').addEventListener('change', loadProject);
 document.getElementById('kerf').addEventListener('input', berechneZuschnitt);
+document.getElementById('unitSelect').addEventListener('change', (e) => {
+  const sel = e.target;
+  const toUnit = sel.value === 'cm' ? 'cm' : 'mm';
+  const fromUnit = sel.dataset.prevUnit || 'mm';
+  convertAllInputsToUnit(fromUnit, toUnit);
+  sel.dataset.prevUnit = toUnit;
+  updateUnitLabels();
+  berechneZuschnitt();
+});
+qs('#unitSelect').dataset.prevUnit = currentUnit();
+updateUnitLabels();
 document.getElementById('toggleCutList').addEventListener('change', berechneZuschnitt);
 
 // Event-Delegation: EIN Listener pro Tabelle statt eines oninput-Handlers auf
