@@ -179,7 +179,43 @@ button.pdf-btn:hover:not(:disabled), button.pdf-btn:active:not(:disabled) { back
 button.undo-btn { background: #16a085; }
 button.undo-btn:hover:not(:disabled), button.undo-btn:active:not(:disabled) { background: #128a72; }
 button.reset-btn { background: #95a5a6; }
+
 button.reset-btn:hover:not(:disabled), button.reset-btn:active:not(:disabled) { background: #7f8c8d; }
+
+.more-toggle-btn {
+  flex: 1 1 100% !important;
+  min-width: 100% !important;
+  background: #5d6d7e !important;
+  color: #fff !important;
+  font-size: 14px !important;
+}
+.more-toggle-btn:hover, .more-toggle-btn:active {
+  background: #4a5a6a !important;
+}
+.action-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 100%;
+  width: 100%;
+  padding: 8px;
+  background: #d5dbe3;
+  border-radius: 8px;
+}
+.action-secondary[hidden] {
+  display: none !important;
+}
+.action-secondary button {
+  flex: 1 1 calc(50% - 8px);
+  min-width: calc(50% - 8px);
+}
+@media (max-width: 400px) {
+  .action-secondary button {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+}
+
 
 .global-settings {
   background: #edf2f7;
@@ -571,15 +607,18 @@ canvas {
 
   <div class="action-bar">
     <button class="calc-btn" id="btnCalc">Zuschnitt live optimieren</button>
-    <button class="undo-btn" id="btnUndo" disabled>↩️ Rückgängig</button>
-    <button class="save-btn" id="btnSave">💾 Sägeprojekt speichern</button>
-    <button class="load-btn">
-      📂 Projekt laden
-      <input type="file" id="importFile" accept=".json">
-    </button>
-    <button class="pdf-btn" id="btnExportPdf">📄 Als PDF exportieren</button>
-    <button class="print-btn" id="btnPrint">🖨️ Sägeplan drucken</button>
-    <button class="reset-btn" id="btnReset">🗑️ Alles zurücksetzen</button>
+    <button type="button" class="more-toggle-btn" id="btnToggleActions">Weitere Aktionen ▾</button>
+    <div class="action-secondary" id="actionSecondary" hidden>
+      <button class="undo-btn" id="btnUndo" disabled>↩️ Rückgängig</button>
+      <button class="save-btn" id="btnSave">💾 Sägeprojekt speichern</button>
+      <button class="load-btn">
+        📂 Projekt laden
+        <input type="file" id="importFile" accept=".json">
+      </button>
+      <button class="pdf-btn" id="btnExportPdf">📄 Als PDF exportieren</button>
+      <button class="print-btn" id="btnPrint">🖨️ Sägeplan drucken</button>
+      <button class="reset-btn" id="btnReset">🗑️ Alles zurücksetzen</button>
+    </div>
   </div>
 
   <div class="result-info" id="resultText">
@@ -1748,6 +1787,23 @@ document.getElementById('partsTable').addEventListener('change', berechneZuschni
 if (!restoreAutosave()) {
   qs('#autosaveNote').textContent = '';
 }
+(function initActionToggle() {
+  const btn = document.getElementById('btnToggleActions');
+  const panel = document.getElementById('actionSecondary');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', () => {
+    const willOpen = panel.hasAttribute('hidden');
+    if (willOpen) {
+      panel.removeAttribute('hidden');
+      btn.textContent = 'Weitere Aktionen ▴';
+      btn.setAttribute('aria-expanded', 'true');
+    } else {
+      panel.setAttribute('hidden', '');
+      btn.textContent = 'Weitere Aktionen ▾';
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+})();
 berechneZuschnitt();
 </script>
 
