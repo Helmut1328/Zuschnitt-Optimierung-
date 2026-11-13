@@ -544,6 +544,14 @@ canvas {
       <input type="checkbox" id="toggleColors" checked style="width:auto;">
       <label for="toggleColors" style="display:inline;">Sägeplan in Farbe</label>
     </div>
+    <div>
+      <input type="checkbox" id="toggleSplitPlates" style="width:auto;">
+      <label for="toggleSplitPlates" style="display:inline;" title="Zu große Bauteile werden in möglichst wenige Teilstücke zerlegt und als (1/n), (2/n) … markiert.">Platten-Übergröße aufteilen</label>
+    </div>
+    <div>
+      <input type="checkbox" id="toggleSplitBeams" style="width:auto;">
+      <label for="toggleSplitBeams" style="display:inline;" title="Zu lange Balkenteile werden in möglichst wenige Längenstücke zerlegt und als (1/n), (2/n) … markiert.">Balken-Übergröße aufteilen</label>
+    </div>
     <span class="autosave-note" id="autosaveNote"></span>
   </div>
 
@@ -940,6 +948,8 @@ function collectProjectData() {
     kerf: qs('#kerf').value,
     showColors: colorsEnabled(),
     showCutList: !!(qs('#toggleCutList') && qs('#toggleCutList').checked),
+    allowSplitPlates: !!(qs('#toggleSplitPlates') && qs('#toggleSplitPlates').checked),
+    allowSplitBeams: !!(qs('#toggleSplitBeams') && qs('#toggleSplitBeams').checked),
     plates: readTableRows('platesTable', PLATE_FIELDS),
     parts: readTableRows('partsTable', PART_FIELDS),
     beams: readTableRows('beamsTable', BEAM_FIELDS),
@@ -960,6 +970,20 @@ function applyProjectData(data) {
   if (typeof data.showCutList === 'boolean') {
     const tl = document.getElementById('toggleCutList');
     if (tl) tl.checked = data.showCutList;
+  }
+  if (typeof data.allowSplitPlates === 'boolean') {
+    const tsp = document.getElementById('toggleSplitPlates');
+    if (tsp) tsp.checked = data.allowSplitPlates;
+  } else if (typeof data.allowSplit === 'boolean') {
+    // ältere Projektdateien: eine gemeinsame Option
+    const tsp = document.getElementById('toggleSplitPlates');
+    const tsb = document.getElementById('toggleSplitBeams');
+    if (tsp) tsp.checked = data.allowSplit;
+    if (tsb) tsb.checked = data.allowSplit;
+  }
+  if (typeof data.allowSplitBeams === 'boolean') {
+    const tsb = document.getElementById('toggleSplitBeams');
+    if (tsb) tsb.checked = data.allowSplitBeams;
   }
   clearTable('platesTable');
   (data.plates || []).forEach((p) => createRow('platesTable', PLATE_FIELDS, p));
@@ -1206,6 +1230,212 @@ function updateSummaryPlacedCounts(plates, summaryList) {
   });
 }
 
+/* ============================== ÜBERGRÖSSE AUFTEILEN ============================== */
+
+function partFitsAnyPlate(part, plates) {
+  for (const plate of plates) {
+    if (plate.thickness !== part.thickness || plate.material !== part.material) continue;
+    if (part.w <= plate.w && part.h <= plate.h) return true;
+    if (part.rotatable && part.h <= plate.w && part.w <= plate.h) return true;
+  }
+  return false;
+}
+
+function getMaxPlateDims(part, plates) {
+  let maxW = 0, maxH = 0;
+  for (const plate of plates) {
+    if (plate.thickness !== part.thickness || plate.material !== part.material) continue;
+    maxW = Math.max(maxW, plate.w);
+    maxH = Math.max(maxH, plate.h);
+  }
+  return { maxW, maxH };
+}
+
+/** Greedy 1D-Aufteilung: so oft wie möglich volle maxLen, letzter Rest kann kürzer sein. */
+function greedySplit1D(total, maxLen) {
+  const full = Math.round(total);
+  const max = Math.round(maxLen);
+  if (max <= 0 || full <= max) return [full];
+  const sizes = [];
+  let remaining = full;
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, max);
+    sizes.push(chunk);
+    remaining -= chunk;
+  }
+  return sizes;
+}
+
+/**
+ * Platten-Bauteil aufteilen: zuerst volle Lagerplatte nutzen, Rest als kürzeres Stück.
+ * Wählt die Achse mit den wenigsten Teilen (bei Gleichstand die mit größerem Restanteil).
+ */
+function splitOversizedPlatePart(part, plates) {
+  if (partFitsAnyPlate(part, plates)) return [part];
+  const { maxW, maxH } = getMaxPlateDims(part, plates);
+  if (maxW <= 0 || maxH <= 0) return [part];
+
+  const fullW = Math.round(part.w);
+  const fullH = Math.round(part.h);
+  const candidates = [];
+
+  // Entlang Breite (Höhe bleibt): volle maxW, dann Rest
+  if (fullH <= maxH && fullW > maxW) {
+    const widths = greedySplit1D(fullW, maxW);
+    candidates.push({ n: widths.length, axis: 'w', sizes: widths, other: fullH });
+  }
+  // Entlang Höhe (Breite bleibt)
+  if (fullW <= maxW && fullH > maxH) {
+    const heights = greedySplit1D(fullH, maxH);
+    candidates.push({ n: heights.length, axis: 'h', sizes: heights, other: fullW });
+  }
+  // Beide Achsen zu groß → Gitter: volle maxW×maxH-Kacheln, Randstreifen als Rest
+  if (fullW > maxW && fullH > maxH) {
+    const widths = greedySplit1D(fullW, maxW);
+    const heights = greedySplit1D(fullH, maxH);
+    candidates.push({ n: widths.length * heights.length, axis: 'grid', widths, heights });
+  }
+
+  // Freie Faser: gedrehte Varianten
+  if (part.rotatable) {
+    // Teil als (h × w) gegen maxW × maxH
+    if (fullW <= maxH && fullH > maxW) {
+      const sizes = greedySplit1D(fullH, maxW);
+      candidates.push({ n: sizes.length, axis: 'w', sizes, other: fullW, swapped: true });
+    }
+    if (fullH <= maxW && fullW > maxH) {
+      const sizes = greedySplit1D(fullW, maxH);
+      candidates.push({ n: sizes.length, axis: 'h', sizes, other: fullH, swapped: true });
+    }
+    if (fullH > maxW && fullW > maxH) {
+      const widths = greedySplit1D(fullH, maxW);
+      const heights = greedySplit1D(fullW, maxH);
+      candidates.push({ n: widths.length * heights.length, axis: 'grid', widths, heights, swapped: true });
+    }
+  }
+
+  if (candidates.length === 0) return [part];
+  // Möglichst wenige Teile
+  candidates.sort((a, b) => a.n - b.n);
+  const best = candidates[0];
+  const pieces = [];
+
+  if (best.axis === 'grid') {
+    const { widths, heights } = best;
+    const n = widths.length * heights.length;
+    let idx = 0;
+    for (let iy = 0; iy < heights.length; iy++) {
+      for (let ix = 0; ix < widths.length; ix++) {
+        idx++;
+        const pw = widths[ix], ph = heights[iy];
+        pieces.push({
+          ...part,
+          name: `${part.name} (${idx}/${n})`,
+          w: pw, h: ph, origW: pw, origH: ph,
+          isSplit: true, splitOf: n, baseName: part.name,
+        });
+      }
+    }
+  } else if (best.axis === 'w') {
+    const n = best.sizes.length;
+    best.sizes.forEach((pw, i) => {
+      pieces.push({
+        ...part,
+        name: `${part.name} (${i + 1}/${n})`,
+        w: pw, h: best.other, origW: pw, origH: best.other,
+        isSplit: true, splitOf: n, baseName: part.name,
+      });
+    });
+  } else {
+    const n = best.sizes.length;
+    best.sizes.forEach((ph, i) => {
+      pieces.push({
+        ...part,
+        name: `${part.name} (${i + 1}/${n})`,
+        w: best.other, h: ph, origW: best.other, origH: ph,
+        isSplit: true, splitOf: n, baseName: part.name,
+      });
+    });
+  }
+  return pieces;
+}
+
+function getMaxBeamLen(part, beams) {
+  let max = 0;
+  for (const b of beams) {
+    if (b.profileKey === part.profileKey && b.materialKey === part.materialKey) max = Math.max(max, b.len);
+  }
+  return max;
+}
+
+/**
+ * Balkenteil aufteilen: so oft wie möglich volle Lagerlänge, letzter Rest kürzer.
+ * Beispiel: 4500 mm auf max. 3000 mm → 3000 + 1500 (nicht 2250 + 2250).
+ */
+function splitOversizedBeamPart(part, beams) {
+  const maxLen = getMaxBeamLen(part, beams);
+  if (maxLen <= 0 || part.len <= maxLen + 1e-9) return [part];
+
+  const sizes = greedySplit1D(part.len, maxLen);
+  if (sizes.length < 2) return [part];
+
+  const ratio = part.origLen > 0 ? part.origLen / part.len : 1;
+  const n = sizes.length;
+  return sizes.map((len, i) => ({
+    ...part,
+    name: `${part.name} (${i + 1}/${n})`,
+    len,
+    origLen: Math.round(len * ratio),
+    isSplit: true, splitOf: n, baseName: part.name,
+  }));
+}
+
+function applyOversizedSplits(plates, partsPool, summaryList, beams, beamPartsPool, beamSummary, opts = {}) {
+  const doPlates = opts.plates !== false;
+  const doBeams = opts.beams !== false;
+
+  let newParts = partsPool;
+  let newSummary = summaryList;
+  if (doPlates) {
+    newParts = [];
+    partsPool.forEach((part) => { splitOversizedPlatePart(part, plates).forEach((s) => newParts.push(s)); });
+    newSummary = [];
+    const partKeyToIdx = new Map();
+    newParts.forEach((p) => {
+      const key = `${p.name}|${p.origW}|${p.origH}|${p.thickness}|${p.material}`;
+      if (partKeyToIdx.has(key)) newSummary[partKeyToIdx.get(key)].count++;
+      else {
+        partKeyToIdx.set(key, newSummary.length);
+        newSummary.push({ name: p.name, w: p.origW, h: p.origH, thickness: p.thickness, material: p.material, count: 1, color: p.color, placed: 0, isSplit: !!p.isSplit, baseName: p.baseName || p.name });
+      }
+    });
+  }
+
+  let newBeamParts = beamPartsPool;
+  let newBeamSummary = beamSummary;
+  if (doBeams) {
+    newBeamParts = [];
+    beamPartsPool.forEach((part) => { splitOversizedBeamPart(part, beams).forEach((s) => newBeamParts.push(s)); });
+    newBeamSummary = [];
+    const beamKeyToIdx = new Map();
+    newBeamParts.forEach((p) => {
+      const key = `${p.name}|${p.origLen}|${p.profileKey}|${p.materialKey}`;
+      if (beamKeyToIdx.has(key)) {
+        const idx = beamKeyToIdx.get(key);
+        newBeamSummary[idx].count++;
+        p.sid = idx;
+      } else {
+        const idx = newBeamSummary.length;
+        beamKeyToIdx.set(key, idx);
+        p.sid = idx;
+        newBeamSummary.push({ name: p.name, len: p.origLen, profile: p.profile || '', material: p.material, count: 1, color: p.color, placed: 0, isSplit: !!p.isSplit });
+      }
+    });
+  }
+
+  return { partsPool: newParts, summaryList: newSummary, beamPartsPool: newBeamParts, beamSummary: newBeamSummary };
+}
+
 /* ============================== INPUT EINLESEN ============================== */
 
 function readInputs() {
@@ -1275,7 +1505,7 @@ function readInputs() {
       beamSummary.push({ name: p.name, len: origLen, profile, material, count, color, placed: 0 });
       for (let c = 0; c < count; c++) {
         beamPartsPool.push({ sid, name: p.name, len: origLen + allowance, origLen,
-          profileKey: normProfile(profileMm), materialKey: normText(material), color });
+          profile, profileKey: normProfile(profileMm), materialKey: normText(material), material, color });
       }
     }
   });
@@ -1474,14 +1704,35 @@ function drawBeam(canvas, beam) {
       ctx.fillStyle = colorOn ? '#ffffff' : '#000000';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      if (w >= 70) {
+      const dimText = `${fromMm(p.len)} ${unitSuffix()}`;
+      const cx = x + w / 2, cy = y0 + barH / 2;
+      if (w >= 110) {
         ctx.font = 'bold 10px Arial';
-        ctx.fillText(p.name || '', x + w / 2, y0 + barH / 2 - 7, w - 4);
+        const nameW = ctx.measureText(p.name || '').width;
         ctx.font = '9px Arial';
-        ctx.fillText(`${fromMm(p.len)} ${unitSuffix()}`, x + w / 2, y0 + barH / 2 + 8, w - 4);
+        const dimW = ctx.measureText(dimText).width;
+        const gap = 6;
+        if (nameW + gap + dimW < w - 8) {
+          ctx.font = 'bold 10px Arial';
+          ctx.fillText(p.name || '', cx - (dimW + gap) / 2, cy);
+          ctx.font = '9px Arial';
+          ctx.globalAlpha = 0.9;
+          ctx.fillText(dimText, cx + (nameW + gap) / 2, cy);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.font = 'bold 10px Arial';
+          ctx.fillText(p.name || '', cx, cy - 7, w - 4);
+          ctx.font = '9px Arial';
+          ctx.fillText(dimText, cx, cy + 8, w - 4);
+        }
+      } else if (w >= 70) {
+        ctx.font = 'bold 10px Arial';
+        ctx.fillText(p.name || '', cx, cy - 7, w - 4);
+        ctx.font = '9px Arial';
+        ctx.fillText(dimText, cx, cy + 8, w - 4);
       } else {
         ctx.font = 'bold 9px Arial';
-        ctx.fillText(`${fromMm(p.len)}`, x + w / 2, y0 + barH / 2, w - 4);
+        ctx.fillText(`${fromMm(p.len)}`, cx, cy, w - 4);
       }
       ctx.textBaseline = 'alphabetic';
     }
@@ -1560,16 +1811,39 @@ function drawPlate(canvas, plate) {
       ctx.textBaseline = 'middle';
       const sizeTxt = `${fromMm(p.wActual)}×${fromMm(p.hActual)}`;
       const maxFont = Math.min(12, Math.max(8, Math.floor(Math.min(w / 8, h / 3))));
-      if (h >= 28) {
+      const cx = x + w / 2, cy = y + h / 2;
+      // Breit und flach → Name und Maß nebeneinander, sonst untereinander
+      if (w >= h * 1.6 && w > 90 && h >= 18) {
         ctx.font = `bold ${maxFont}px Arial`;
-        ctx.fillText(p.name || '', x + w / 2, y + h / 2 - maxFont * 0.55, w - 4);
+        const nameW = ctx.measureText(p.name || '').width;
         ctx.font = `${Math.max(7, maxFont - 1)}px Arial`;
-        ctx.fillText(sizeTxt, x + w / 2, y + h / 2 + maxFont * 0.55, w - 4);
+        const dimW = ctx.measureText(sizeTxt).width;
+        const gap = 6;
+        if (nameW + gap + dimW < w - 8) {
+          ctx.font = `bold ${maxFont}px Arial`;
+          ctx.fillText(p.name || '', cx - (dimW + gap) / 2, cy);
+          ctx.font = `${Math.max(7, maxFont - 1)}px Arial`;
+          ctx.globalAlpha = 0.9;
+          ctx.fillText(sizeTxt, cx + (nameW + gap) / 2, cy);
+          ctx.globalAlpha = 1;
+        } else if (h >= 28) {
+          ctx.font = `bold ${maxFont}px Arial`;
+          ctx.fillText(p.name || '', cx, cy - maxFont * 0.55, w - 4);
+          ctx.font = `${Math.max(7, maxFont - 1)}px Arial`;
+          ctx.fillText(sizeTxt, cx, cy + maxFont * 0.55, w - 4);
+        } else {
+          ctx.font = `bold ${Math.max(7, maxFont)}px Arial`;
+          ctx.fillText((p.name && w > 50) ? p.name : sizeTxt, cx, cy, w - 4);
+        }
+      } else if (h >= 28) {
+        ctx.font = `bold ${maxFont}px Arial`;
+        ctx.fillText(p.name || '', cx, cy - maxFont * 0.55, w - 4);
+        ctx.font = `${Math.max(7, maxFont - 1)}px Arial`;
+        ctx.fillText(sizeTxt, cx, cy + maxFont * 0.55, w - 4);
       } else {
-        // wenig Höhe: Name bevorzugt, sonst Maß
         ctx.font = `bold ${Math.max(7, maxFont)}px Arial`;
         const label = (p.name && w > 50) ? p.name : sizeTxt;
-        ctx.fillText(label, x + w / 2, y + h / 2, w - 4);
+        ctx.fillText(label, cx, cy, w - 4);
       }
       ctx.textBaseline = 'alphabetic';
     }
@@ -1605,6 +1879,7 @@ function renderResultText(stats, summaryList, totalPartsOrdered, beamStats, beam
   const totalOrdered = totalPartsOrdered + totalBeamPartsOrdered;
   const totalPlaced = placedPlateParts + placedBeamParts;
   const missing = totalOrdered - totalPlaced;
+  const splitCount = summaryList.filter((s) => s.isSplit).length + beamSummary.filter((s) => s.isSplit).length;
 
   const showPlates = totalPartsOrdered > 0 || stats.totalPlatesUsed > 0 || totalBeamPartsOrdered === 0;
   const showBeams = totalBeamPartsOrdered > 0 || beamStats.totalBeamsUsed > 0;
@@ -1623,6 +1898,9 @@ function renderResultText(stats, summaryList, totalPartsOrdered, beamStats, beam
   if (showPlates) html += `Benötigte Trägerplatten: <strong>${stats.totalPlatesUsed} Stück</strong> verwendet.<br>`;
   if (showBeams) html += `Benötigte Balken: <strong>${beamStats.totalBeamsUsed} Stück</strong> verwendet (${(beamStats.totalLenAvailable / 1000).toFixed(2)} m Lagerlänge).<br>`;
   html += `Bauteile zugewiesen: <strong>${totalPlaced} von ${totalOrdered} Teilen</strong> (${placementText})<br>`;
+  if (splitCount > 0) {
+    html += `<span style="color:#d35400;">✂ ${splitCount} Position(en) wurden wegen Übergröße automatisch aufgeteilt (min. Teile).</span><br>`;
+  }
   if (showPlates) html += `Reine Bauteil-Flächennutzung: <strong>${plateEff}%</strong> (Große, zusammenhängende Restplatten wurden maximiert!).<br>`;
   if (showBeams) html += `Reine Bauteil-Längennutzung (Balken): <strong>${beamEff}%</strong>.<br>`;
   if (totalCost > 0) html += `Materialkosten (nur verwendete Platten/Balken): <strong>${totalCost.toFixed(2)} €</strong>`;
@@ -1643,11 +1921,14 @@ function renderSummaryTable(summaryList, beamSummary = []) {
     const isComplete = item.placed === item.count;
     const statusText = isComplete ? '✔️ Fertig' : `⚠️ ${item.count - item.placed} fehlen!`;
     const statusColor = isComplete ? '#27ae60' : '#e74c3c';
+    const splitBadge = item.isSplit
+      ? ' <span style="font-weight:normal;font-size:11px;color:#d35400;">✂ aufgeteilt</span>'
+      : '';
     const row = tbody.insertRow();
     row.innerHTML =
       `<td><span class="color-badge" style="background-color:${item.color}"></span></td>` +
-      `<td style="text-align:left; font-weight:bold;">${item.name}</td>` +
-      `<td>${item.material}</td>` +
+      `<td style="text-align:left; font-weight:bold;">${esc(item.name)}${splitBadge}</td>` +
+      `<td>${esc(item.material)}</td>` +
       `<td>${fromMm(item.w)} ${unitSuffix()}</td><td>${fromMm(item.h)} ${unitSuffix()}</td><td><strong>${fromMm(item.thickness)} ${unitSuffix()}</strong></td>` +
       `<td>${item.count}</td><td><strong style="color:${statusColor}">${item.placed}</strong></td>` +
       `<td style="color:${statusColor}; font-weight:bold;">${statusText}</td>`;
@@ -1657,10 +1938,13 @@ function renderSummaryTable(summaryList, beamSummary = []) {
     const isComplete = item.placed === item.count;
     const statusText = isComplete ? '✔️ Fertig' : `⚠️ ${item.count - item.placed} fehlen!`;
     const statusColor = isComplete ? '#27ae60' : '#e74c3c';
+    const splitBadge = item.isSplit
+      ? ' <span style="font-weight:normal;font-size:11px;color:#d35400;">✂ aufgeteilt</span>'
+      : '';
     const row = tbody.insertRow();
     row.innerHTML =
       `<td><span class="color-badge" style="background-color:${item.color}"></span></td>` +
-      `<td style="text-align:left; font-weight:bold;">${esc(item.name)} <span style="font-weight:normal;color:#7f8c8d;">(Balken)</span></td>` +
+      `<td style="text-align:left; font-weight:bold;">${esc(item.name)}${splitBadge} <span style="font-weight:normal;color:#7f8c8d;">(Balken)</span></td>` +
       `<td>${esc(item.material)}</td>` +
       `<td><strong>${fromMm(item.len)} ${unitSuffix()}</strong></td><td colspan="2">Querschnitt ${esc(item.profile || '–')}</td>` +
       `<td>${item.count}</td><td><strong style="color:${statusColor}">${item.placed}</strong></td>` +
@@ -1758,8 +2042,25 @@ async function exportPDF() {
 /* ============================== ORCHESTRIERUNG ============================== */
 
 function berechneZuschnitt() {
-  const kerf = parseFloat(qs('#kerf').value) || 0;
-  const { plates, partsPool, summaryList, beams, beamPartsPool, beamSummary } = readInputs();
+  const kerf = toMm(qs('#kerf').value);
+  let { plates, partsPool, summaryList, beams, beamPartsPool, beamSummary } = readInputs();
+
+  const splitPlates = !!(qs('#toggleSplitPlates') && qs('#toggleSplitPlates').checked);
+  const splitBeams = !!(qs('#toggleSplitBeams') && qs('#toggleSplitBeams').checked);
+  if (splitPlates || splitBeams) {
+    const split = applyOversizedSplits(plates, partsPool, summaryList, beams, beamPartsPool, beamSummary, {
+      plates: splitPlates,
+      beams: splitBeams,
+    });
+    if (splitPlates) {
+      partsPool = split.partsPool;
+      summaryList = split.summaryList;
+    }
+    if (splitBeams) {
+      beamPartsPool = split.beamPartsPool;
+      beamSummary = split.beamSummary;
+    }
+  }
 
   packParts(plates, partsPool, kerf);
   updateSummaryPlacedCounts(plates, summaryList);
@@ -1836,6 +2137,8 @@ qs('#unitSelect').dataset.prevUnit = currentUnit();
 updateUnitLabels();
 document.getElementById('toggleCutList').addEventListener('change', berechneZuschnitt);
 document.getElementById('toggleColors').addEventListener('change', berechneZuschnitt);
+document.getElementById('toggleSplitPlates').addEventListener('change', berechneZuschnitt);
+document.getElementById('toggleSplitBeams').addEventListener('change', berechneZuschnitt);
 
 // Event-Delegation: EIN Listener pro Tabelle statt eines oninput-Handlers auf
 // jedem einzelnen Input/Select – funktioniert auch für dynamisch hinzugefügte
